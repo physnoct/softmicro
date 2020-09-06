@@ -140,6 +140,7 @@ char c = 0x00;
         switch(toupper(c))
         {
             case 'A':
+                printf("\033[J");
                 ClrRegisters();
                 break;
             case ' ':
@@ -153,16 +154,20 @@ char c = 0x00;
                 Run();
                 break;
             case 'E':
+                printf("\033[J");
                 ClearMemory();
                 break;
             case 'L':
+                printf("\033[J");
                 LoadMemory();
                 break;
             case 'S':
+                printf("\033[J");
                 SaveMemory();
                 break;
 
             case 'Q':
+                printf("\033[J");
                 exit(0);
             default:
             ;
