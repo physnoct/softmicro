@@ -174,44 +174,44 @@ int16_t temp;
                 break;
 
             /* Unary ops */
-            case 0x20: // SWAP
-                app_reg[0][0] = swap_byte(app_reg[0][0]);
-                break;
-            case 0x21: // REV
-                app_reg[0][0] = reverse_byte(app_reg[0][0]);
-                break;
-            case 0x22: // DAA
+            case 0x20: // DAA
                 app_reg[0][0] = daa_byte(app_reg[0][0]);
                 break;
-            case 0x23: // TOA
+            case 0x21: // TOA
                 app_reg[0][0] = toa_byte(app_reg[0][0]);
                 break;
-            case 0x24: // TOH
+            case 0x22: // TOH
                 app_reg[0][0] = toh_byte(app_reg[0][0]);
                 break;
-            case 0x25: // BCD
+            case 0x23: // BCD
                 app_reg[0][0] = bcd_byte(app_reg[0][0]);
                 break;
-            case 0x26: // BIN
+            case 0x24: // BIN
                 app_reg[0][0] = bin_byte(app_reg[0][0]);
                 break;
-            case 0x27: // SXT
-                op_sxt();
-                break;
-            case 0x28: // CPL
-                op_cpl();
-                break;
-            case 0x29: // NEG
-                op_neg();
-                break;
-            case 0x2a: // LDF
+            case 0x25: // LDF
                 app_reg[0][0] = app_flags;
                 break;
-            case 0x2b: // STF
+            case 0x26: // STF
                 app_flags = app_reg[0][0];
                 break;
-            case 0x2c: // MSK
+            case 0x27: // MSK
                 app_reg[0][0] = 1 << (app_reg[0][0] & 0x07);
+                break;
+            case 0x28: // SWAP
+                app_reg[0][0] = swap_byte(app_reg[0][0]);
+                break;
+            case 0x29: // REV
+                app_reg[0][0] = reverse_byte(app_reg[0][0]);
+                break;
+            case 0x2a: // SXT
+                op_sxt();
+                break;
+            case 0x2b: // CPL
+                op_cpl();
+                break;
+            case 0x2c: // NEG
+                op_neg();
                 break;
 
             /* shift/rotate */
@@ -266,7 +266,6 @@ int16_t temp;
 void OpStep2(void)
 {
 uint8_t op_code,param;
-int16_t temp;
 
     op_code = app_memory[app_pc++];
 
@@ -350,13 +349,13 @@ int16_t temp;
                 op_ex();
                 break;
 
-            case 0x27: // SXT
+            case 0x2a: // SXT
                 op_sxt();
                 break;
-            case 0x28: // CPL
+            case 0x2b: // CPL
                 op_cpl();
                 break;
-            case 0x29: // NEG
+            case 0x2c: // NEG
                 op_neg();
                 break;
 
@@ -397,7 +396,6 @@ int16_t temp;
 void OpStep3(void)
 {
 uint8_t op_code,param;
-int16_t temp;
 
     op_code = app_memory[app_pc++];
 
@@ -482,13 +480,13 @@ int16_t temp;
                 op_out();
                 break;
 
-            case 0x27: // SXT
+            case 0x2a: // SXT
                 op_sxt();
                 break;
-            case 0x28: // CPL
+            case 0x2b: // CPL
                 op_cpl();
                 break;
-            case 0x29: // NEG
+            case 0x2c: // NEG
                 op_neg();
                 break;
 

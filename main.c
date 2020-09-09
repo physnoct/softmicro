@@ -108,7 +108,7 @@ void Run(void)
 
 int main()
 {
-int i;
+//int i;
 char c = 0x00;
 
     ClrRegisters();

@@ -53,6 +53,7 @@ void test_bit_reg(uint8_t bit, uint8_t reg);
 void set_bit(void);
 void toggle_bit(void);
 void test_bit(void);
+void wait_bit(void);
 
 #endif // _ROUTINES_H_
 

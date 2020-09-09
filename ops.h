@@ -17,6 +17,7 @@ void op_and(void);
 void op_or(void);
 void op_xor(void);
 void op_inc(uint8_t reg[]);
+void op_dec(uint8_t reg[]);
 void op_in(void);
 void op_out(void);
 void op_asx(void);

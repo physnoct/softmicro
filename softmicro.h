@@ -5,6 +5,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "routines.h"
+#include "ops.h"
+
 #define VECTOR_TABLE_BEGIN 0xFFE0
 
 void OpStep(void);

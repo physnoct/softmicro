@@ -1,5 +1,4 @@
 #include "softmicro.h"
-#include "routines.h"
 
 void illegal_inst(void)
 {
@@ -95,9 +94,10 @@ uint8_t reverse_byte(uint8_t byte)
 
 uint8_t daa_byte(uint8_t byte)
 {
-uint8_t temp;
+//uint8_t temp;
     //temp = byte & 0x0f;
     //FIXME
+    return 0;
 }
 
 /* Convert nibble to ASCII */
@@ -406,8 +406,6 @@ void inc(uint8_t param)
 
 void dec(uint8_t param)
 {
-int i;
-
     if (adr_mode == 0)
     {
         op_dec(app_reg[param]);
@@ -449,7 +447,6 @@ uint8_t mask;
 void set_bit(void)
 {
 uint8_t pair,bit,reg;
-uint16_t addr,disp16;
 bool val;
 
     if (app_size != 1) illegal_inst();
