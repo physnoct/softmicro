@@ -43,7 +43,7 @@ function CMP(reg,value)
 
 function BIT(bit,reg)
 {
-	printf("\tbit\t%s.%s\n",reg,bit)
+	printf("\ttest\t%s.%s\n",reg,bit)
 }
 
 function ANL(reg,mask)

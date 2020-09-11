@@ -395,8 +395,8 @@ function M_COMPARE_NJMP3(register,condition,value,label,ctr1,ctr2,ctr3)
 	}
 }
 
-function DEC_JUMP_NZ(REGISTER,TYPE,CTR1,CTR2,CTR3)
+function DEC_JUMP_NZ(REGISTER,TYPE,CTR1,CTR2)
 {
-    printf("\tdjnz\t%s,%s%02d%03d%02d\n",REGISTER,TYPE,CTR1,CTR2,CTR3)
+    printf("\tdjnz\t%s,%s%02d%03d\n",REGISTER,TYPE,CTR1,CTR2)
 }
 

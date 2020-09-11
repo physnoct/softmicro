@@ -16,7 +16,7 @@ STRUCT = $(AWKPATH)/struct_softmicro.awk
 STRUCT_FILES = struct_softmicro.awk struct_cond.awk struct_macros.awk struct_tests.awk
 
 AS = -customasm
-ASFLAGS = -f annotated
+ASFLAGS = -f intelhex
 #LINK = -sdldz80
 
 all: $(PGM).hex $(PGM).bin
@@ -30,7 +30,9 @@ clean:
 
 # Compile
 .softmi.hex:
-	$(AS) $(ASFLAGS) -o $@ $<
+	$(AS) -f intelhex -o $@ $<
+	$(AS) -f annotated -o $(PGM).lst $<
+
 
 # Link
 #$(PGM).hex: $(OBJ)

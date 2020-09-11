@@ -101,7 +101,7 @@ mem_ptr = 0x7fff
 		;_endif	LEVEL 1
 		_endif
 
-.equ VALUE_MASK, 0x0F
+VALUE_MASK = 0x0F
 
         ;----------------------------
 		;test switch, no mask
@@ -461,7 +461,7 @@ tests:
 ;test_do_while_range
         _do
 ;loop:
-            ld		r0,#'>
+            ld		r0,#0x39
 
 		;If command is not valid, discard and wait for another one
 		_do_while_range(r0,r2,r1)
