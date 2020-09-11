@@ -52,6 +52,9 @@ int16_t temp;
                 case 0xA0:
                     dec(param);
                     break;
+                case 0xb0:
+                    sfl(param);
+                    break;
                 default:
                 ;
             }
@@ -174,9 +177,6 @@ int16_t temp;
                 break;
 
             /* Unary ops */
-            case 0x20: // DAA
-                app_reg[0][0] = daa_byte(app_reg[0][0]);
-                break;
             case 0x21: // TOA
                 app_reg[0][0] = toa_byte(app_reg[0][0]);
                 break;
@@ -300,6 +300,9 @@ uint8_t op_code,param;
                 case 0xA0:
                     dec(param);
                     break;
+                case 0xb0:
+                    sfl(param);
+                    break;
                 default:
                     illegal_inst();
             }
@@ -347,6 +350,10 @@ uint8_t op_code,param;
                 break;
             case 0x19: //EX
                 op_ex();
+                break;
+
+            case 0x29: // REV
+                op_rev();
                 break;
 
             case 0x2a: // SXT
@@ -419,6 +426,7 @@ uint8_t op_code,param;
                 case 0x70:
                     djnz(param);
                     break;
+/*
                 case 0x80:
                     clr(param);
                     break;
@@ -428,6 +436,10 @@ uint8_t op_code,param;
                 case 0xA0:
                     dec(param);
                     break;
+                case 0xb0:
+                    sfl(param);
+                    break;
+*/
                 default:
                     illegal_inst();
             }
@@ -480,6 +492,9 @@ uint8_t op_code,param;
                 op_out();
                 break;
 
+            case 0x29: // REV
+                op_rev();
+                break;
             case 0x2a: // SXT
                 op_sxt();
                 break;
@@ -507,11 +522,9 @@ uint8_t op_code; //,param;
     switch(op_code)
     {
         case 0x00: //VER
-            app_pc++;
             app_reg[0][0] = 1;
             break;
         case 0x01: //SN
-            app_pc++;
             app_reg[0][0] = 0xEF;
             app_reg[0][1] = 0xBE;
             app_reg[0][2] = 0xAD;
@@ -522,31 +535,29 @@ uint8_t op_code; //,param;
             app_reg[0][7] = 0xFE;
             break;
         case 0x02: //HALT
+            app_pc--;
             printf("Halt\n");
             break;
         case 0x03: // CLR H
             app_flags &= ~FLAG_H_MASK;
-            app_pc++;
             break;
         case 0x04: // SET H
             app_flags |= FLAG_H_MASK;
-            app_pc++;
             break;
         case 0x05: // TOG H
             app_flags ^= FLAG_H_MASK;
-            app_pc++;
             break;
         case 0x06: // CLR T
             app_flags &= ~FLAG_T_MASK;
-            app_pc++;
             break;
         case 0x07: // SET T
             app_flags |= FLAG_T_MASK;
-            app_pc++;
             break;
         case 0x08: // TOG T
             app_flags ^= FLAG_T_MASK;
-            app_pc++;
+            break;
+        case 0x09: // DAA
+            app_reg[0][0] = daa_byte(app_reg[0][0]);
             break;
         default:
             illegal_inst();

@@ -3,6 +3,7 @@
 
 /* reg ops */
 void setflags(uint8_t reg[]);
+void op_rev(void);
 void op_sxt(void);
 void op_cpl(void);
 void op_neg(void);

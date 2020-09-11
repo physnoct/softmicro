@@ -415,6 +415,17 @@ void dec(uint8_t param)
     }
 }
 
+void sfl(uint8_t param)
+{
+    if (adr_mode == 0)
+    {
+        setflags(app_reg[param]);
+    }
+    else
+    {
+    }
+}
+
 uint8_t set_bit_val(bool val, uint8_t bit, uint8_t reg)
 {
 uint8_t temp, mask;

@@ -17,6 +17,29 @@ uint8_t sign;
     app_flags = sign | (~zero & FLAG_Z_MASK);
 }
 
+/* reverse bits MSB <-> LSB */
+void op_rev(void)
+{
+uint8_t reg,temp;
+int i;
+    reg = adr_mode & 0x0f;
+
+    switch(adr_mode & 0xf0)
+    {
+        case 0:
+        case 0xF0:
+            for (i=0;i<app_size;i++)
+            {
+                temp = reverse_byte(app_reg[reg][(app_size-1)-i]);
+                app_reg[reg][(app_size-1)-i] = reverse_byte(app_reg[reg][i]);
+                app_reg[reg][i] = temp;
+            }
+            break;
+        default:
+            illegal_inst();
+    }
+}
+
 void op_sxt(void)
 {
 uint8_t reg;
