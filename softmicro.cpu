@@ -48,7 +48,7 @@
 
     #tokendef byte_ops_table
     {
-        daa = 0x20
+;        TBD = 0x20
         toa = 0x21
         toh = 0x22
         bcd = 0x23
@@ -66,6 +66,14 @@
         cpl = 0x2b
         neg = 0x2c
     }
+
+	#tokendef CIDS_ops_table
+	{
+		clr = 0x80
+		inc = 0x90
+		dec = 0xa0
+		sfl = 0xb0
+	}
 
     #tokendef flags_table
     {
@@ -303,14 +311,10 @@
     }
 
     ;--------------------------
-    ; CLR,INC,DEC
+    ; CLR,INC,DEC,SFL (CIDS ops)
     ;--------------------------
-    clr {dest: reg_table}  -> {inst = 0x80 | dest[3:0], inst[7:0]}
-    inc {dest: reg_table}  -> {inst = 0x90 | dest[3:0], inst[7:0]}
-    dec {dest: reg_table}  -> {inst = 0xA0 | dest[3:0], inst[7:0]}
-    clr.{size: size_table} {dest: reg_table}  -> {inst = 0x80 | dest[3:0], size[7:0] @ inst[7:0]}
-    inc.{size: size_table} {dest: reg_table}  -> {inst = 0x90 | dest[3:0], size[7:0] @ inst[7:0]}
-    dec.{size: size_table} {dest: reg_table}  -> {inst = 0xA0 | dest[3:0], size[7:0] @ inst[7:0]}
+    {op: CIDS_ops_table} {dest: reg_table}  -> {inst = op | dest[3:0], inst[7:0]}
+	{op: CIDS_ops_table}.{size: size_table} {dest: reg_table}  -> {inst = op | dest[3:0], size[7:0] @ inst[7:0]}
 
     ;--------------------------
     ; BIT,TOG,TEST,WAITR
