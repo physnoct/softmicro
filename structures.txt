@@ -1,0 +1,47 @@
+;Do .. while/While .. end structures with redo/break
+        ;c > A
+        _do
+			;some code
+			ld	a,c
+			out (0x00),a
+        _do_while_cmp(c,>,A)
+
+		_do
+			ld	a,b
+			out (0x00),a
+		_do_while_dnz(b)
+
+;Switch structure
+
+		_sw_case(b)
+
+		_case (#1)
+            ;CODE CASE 1
+			_sw_break
+
+		_sw_default
+			;CODE
+		_sw_end
+
+;If . then else structure
+		_if_z
+			ld	a,#1
+		_else
+			ld	a,#2
+		_endif
+
+		out	(0x00),a
+
+;---------------------------------------------------------
+; Different conditions can be used in various combinations
+; Flags: z,cy,nz,nz,plus,minus
+; Bits: bit,not_bit
+; Equ, equ with mask: equ,neq,equm,neqm
+;	A ?= Value
+;	A and Mask ?= Value
+; Range:
+;	Min <= A < Max
+; Compare:
+;	A ? B	where ? is <,>,=,<=,>=,!=
+
+
