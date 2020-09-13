@@ -197,7 +197,7 @@ int16_t disp16;
         default:
             illegal_inst();
     }
-    printf("get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
+    if (step_mode) printf("get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
     return disp16;
 }
 
@@ -228,7 +228,7 @@ int16_t sp;
     app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
     app_memory[(sp-2)&0xffff] = value & 0xff;
     setsp(sp-2);
-    printf("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
+    if (step_mode) printf("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
 }
 
 int16_t get_retaddr(void)
@@ -238,7 +238,7 @@ int16_t sp;
     sp = getsp();
     setsp(sp+2);
 
-    printf("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
+    if (step_mode) printf("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
     return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
 }
 
@@ -248,7 +248,7 @@ uint16_t sp;
 
     sp = (getsp() - 1) & 0xffff;
 
-    printf("push_byte:\tSP: %04X\n",sp);
+    if (step_mode) printf("push_byte:\tSP: %04X\n",sp);
     app_memory[sp] = my_byte;
     setsp(sp);
 }
@@ -265,7 +265,6 @@ uint8_t my_byte;
     return my_byte;
 }
 
-
 void branch(uint8_t param)
 {
 uint8_t test_bit,test_mask,test;
@@ -276,7 +275,7 @@ uint8_t test_bit,test_mask,test;
     test_mask = 1 << test_bit;
     test = (param & 0x01) << test_bit;
 
-    printf("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
+    if (step_mode) printf("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
 
     if ((app_flags & test_mask) == test)
     {
@@ -316,7 +315,7 @@ int16_t temp;
     put_retaddr(app_pc + app_size); // next instruction after call
     temp = get_disp();
     app_pc += temp;
-    printf("BSR %04X (%04X)\n",temp, app_pc);
+    if (step_mode) printf("BSR %04X (%04X)\n",temp, app_pc);
 }
 
 void br_always(void)
@@ -324,7 +323,7 @@ void br_always(void)
 int16_t temp;
 
     temp = get_disp();
-    printf("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) printf("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
     app_pc = app_pc + app_size + temp;
 }
 
@@ -364,7 +363,7 @@ void djnz(uint8_t param)
 int16_t temp;
 
     temp = get_disp();
-    printf("DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) printf("DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
 
     app_reg[param][0] -= 1;
 
@@ -420,7 +419,7 @@ void dec(uint8_t param)
 
 void sfl(uint8_t param)
 {
-    printf("SFL: param: %02X\n",param);
+    if (step_mode) printf("SFL: param: %02X\n",param);
     if (adr_mode == 0)
     {
         setflags(app_reg[param]);

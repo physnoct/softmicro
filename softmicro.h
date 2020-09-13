@@ -20,6 +20,7 @@ extern uint8_t app_reg[16][16];
 extern uint8_t app_flags;
 extern int16_t app_pc;
 extern uint8_t app_size,adr_mode;
+extern bool step_mode;
 
 #define FLAG_S_MASK 0x80
 #define FLAG_T_MASK 0x40

@@ -132,6 +132,8 @@ FILE *p;
 
 void Run(void)
 {
+    step_mode = false;
+    while (!step_mode) OpStep();
 }
 
 int main()
