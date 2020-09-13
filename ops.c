@@ -9,12 +9,14 @@ int i;
 uint8_t zero = 0;
 uint8_t sign;
 
-    for (i=1;i<app_size;i++)
+    for (i=0;i<app_size;i++)
     {
         zero |= reg[i];
     }
     sign = reg[app_size-1] & 0x80; // sign flag in bit 7 for convenience
-    app_flags = sign | (~zero & FLAG_Z_MASK);
+    app_flags &= ~(FLAG_S_MASK | FLAG_Z_MASK);     // erase previous flags
+    app_flags |= sign;
+    if (zero == 0) app_flags |= FLAG_Z_MASK;
 }
 
 /* reverse bits MSB <-> LSB */
@@ -295,7 +297,7 @@ int i;
     }
 }
 
-int16_t ex_reg_memory(uint8_t addr, uint8_t reg)
+int16_t ex_reg_memory(uint16_t addr, uint8_t reg)
 {
 uint8_t temp;
 int i;
@@ -333,16 +335,24 @@ int i;
             switch (adr_mode)
             {
                 case 0x38: //r,*p
-                case 0x3c:
                     pair = app_memory[app_pc++];
                     src = pair & 0x0f;
                     dest = (pair & 0xf0)>>4;
+
                     addr = get_addr(src);
                     ex_reg_memory(addr,dest);
                     break;
 
+                case 0x3c: //*p,r
+                    pair = app_memory[app_pc++];
+                    src = pair & 0x0f;
+                    dest = (pair & 0xf0)>>4;
+
+                    addr = get_addr(dest);
+                    ex_reg_memory(addr,src);
+                    break;
+
                 case 0x39: //r,*p++
-                case 0x3d:
                     pair = app_memory[app_pc++];
                     src = pair & 0x0f;
                     dest = (pair & 0xf0)>>4;
@@ -352,8 +362,17 @@ int i;
                     set_addr(src,addr);
                     break;
 
+                case 0x3d: //*p++,r
+                    pair = app_memory[app_pc++];
+                    src = pair & 0x0f;
+                    dest = (pair & 0xf0)>>4;
+
+                    addr = get_addr(dest);
+                    addr = ex_reg_memory(addr,src);
+                    set_addr(dest,addr);
+                    break;
+
                 case 0x3A: //r,--*p
-                case 0x3e:
                     pair = app_memory[app_pc++];
                     src = pair & 0x0f;
                     dest = (pair & 0xf0)>>4;
@@ -363,8 +382,17 @@ int i;
                     set_addr(src,addr);
                     break;
 
+                case 0x3e: //--*p,r
+                    pair = app_memory[app_pc++];
+                    src = pair & 0x0f;
+                    dest = (pair & 0xf0)>>4;
+
+                    addr = get_addr(dest) - app_size;
+                    addr = ex_reg_memory(addr,src);
+                    set_addr(dest,addr);
+                    break;
+
                 case 0x3B: //r,p[d] d: index 0-n
-                case 0x3f:
                     pair = app_memory[app_pc++];
                     disp = app_memory[app_pc++];
                     src = pair & 0x0f;
@@ -372,6 +400,16 @@ int i;
 
                     addr = get_addr(src) + disp * app_size;
                     ex_reg_memory(addr,dest);
+                    break;
+
+                case 0x3f:
+                    pair = app_memory[app_pc++];
+                    disp = app_memory[app_pc++];
+                    src = pair & 0x0f;
+                    dest = (pair & 0xf0)>>4;
+
+                    addr = get_addr(dest) + disp * app_size;
+                    ex_reg_memory(addr,src);
                     break;
 
                 default:

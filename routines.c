@@ -225,10 +225,10 @@ void put_retaddr(int16_t value)
 int16_t sp;
 
     sp = getsp();
-    app_memory[sp-1] = (value >> 8) & 0xff;
-    app_memory[sp-2] = value & 0xff;
+    app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
+    app_memory[(sp-2)&0xffff] = value & 0xff;
     setsp(sp-2);
-    printf("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp,app_memory[sp-1],app_memory[sp-2]);
+    printf("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
 }
 
 int16_t get_retaddr(void)
@@ -237,7 +237,9 @@ int16_t sp;
 
     sp = getsp();
     setsp(sp+2);
-    return app_memory[sp+1]*256 + app_memory[sp];
+
+    printf("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
+    return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
 }
 
 void push_byte(uint8_t my_byte)
@@ -266,18 +268,19 @@ uint8_t my_byte;
 
 void branch(uint8_t param)
 {
-uint8_t test_bit,test_mask;
-bool test;
+uint8_t test_bit,test_mask,test;
 
     // Bit 3-1  flag
     // Bit 0    0:clear 1:set
     test_bit = (param & 0x0E) >> 1;
     test_mask = 1 << test_bit;
-    test = param & 0x01;
+    test = (param & 0x01) << test_bit;
+
+    printf("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
 
     if ((app_flags & test_mask) == test)
     {
-        app_pc += get_disp();
+        app_pc = app_pc + app_size + get_disp();
     }
     else
     {
@@ -298,7 +301,7 @@ bool n,v;
 
     if (bool_xor(n,v) == test)
     {
-        app_pc += get_disp();
+        app_pc = app_pc + app_size + get_disp();
     }
     else
     {
@@ -417,6 +420,7 @@ void dec(uint8_t param)
 
 void sfl(uint8_t param)
 {
+    printf("SFL: param: %02X\n",param);
     if (adr_mode == 0)
     {
         setflags(app_reg[param]);

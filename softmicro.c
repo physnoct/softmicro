@@ -20,7 +20,7 @@ int16_t temp;
 
     if (op_code >= 0x40)
     {
-        if  (op_code >= 0xB0)
+        if  (op_code >= 0xC0)
         {
             adr_mode = op_code;
             OpStep3();
@@ -92,7 +92,7 @@ int16_t temp;
                 put_retaddr(app_pc + 2); // next instruction after call
                 app_pc = getword(app_pc);
                 temp = getsp();
-                printf("CALL %04X, SP: %04X, Ret Addr %04X\n",app_pc,temp & 0xFFFF,app_memory[temp+1]*256+app_memory[temp]);
+                printf("CALL %04X, SP: %04X, Ret Addr %04X\n",app_pc,temp & 0xffff,app_memory[(temp+1) & 0xffff]*256+app_memory[temp & 0xffff]);
                 break;
             case 0x09: //BSR
                 br_sbr();
@@ -273,7 +273,7 @@ uint8_t op_code,param;
 
     if (op_code >= 0x40)
     {
-        if  (op_code >= 0xB0)
+        if  (op_code >= 0xC0)
         {
             /* address prefix */
             adr_mode = op_code;
@@ -410,7 +410,7 @@ uint8_t op_code,param;
 
     if (op_code >= 0x70)
     {
-        if  (op_code >= 0xB0)
+        if  (op_code >= 0xC0)
         {
             illegal_inst();
         }

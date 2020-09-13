@@ -25,12 +25,13 @@ uint16_t sp;
 
     /* Restore cursor position */
     printf("Size: %d, Address mode: %02X\n",app_size,adr_mode);
-    printf("PC: %04X: %02X %02X %02X %02X\n",app_pc & 0xFFFF,
-        app_memory[app_pc],
-        app_memory[app_pc+1],
-        app_memory[app_pc+2],
-        app_memory[app_pc+3]);
-    printf("Flags: S T H I V N Z C               \tSP+03: %04X [%02X]\n       ",(sp+3)&0xFFFF,app_memory[(sp+3) & 0xffff]);
+    printf("PC: %04X:",app_pc & 0xFFFF);
+    for (i=0;i<12;i++)
+    {
+        printf(" %02X",app_memory[app_pc+i]);
+    }
+
+    printf("\nFlags: S T H I V N Z C               \tSP+03: %04X [%02X]\n       ",(sp+3)&0xFFFF,app_memory[(sp+3) & 0xffff]);
     PrintBinary2(app_flags);
 
     printf("               \tSP+02: %04X [%02X]\n",(sp+2)&0xFFFF,app_memory[(sp+2) & 0xffff]);
@@ -74,6 +75,33 @@ int i;
     for (i=0;i<65536;i++)
     {
         app_memory[i] = 0;
+    }
+}
+
+void LoadBinaryFile(void)
+{
+FILE *fp;
+char filename[128];
+long fileSize;
+int result;
+
+    printf("File to open: ");
+    result = scanf("%s",filename);
+    printf("Result: %02X, filename: %s\n",result,filename);
+
+    fp = fopen(filename,"rb");
+    if (fp == NULL) printf("File %s not found\n",filename);
+    else
+    {
+        fseek(fp, 0 , SEEK_END);
+        fileSize = ftell(fp);
+        fseek(fp, 0 , SEEK_SET);// needed for next read from beginning of file
+
+        if (fileSize > 65536) fileSize = 65536;
+
+        fread(app_memory,1,fileSize,fp);
+        printf("File %s loaded\n",filename);
+        fclose(fp);
     }
 }
 
@@ -128,6 +156,7 @@ char c = 0x00;
                 "\tC\t\n"
                 "\tD\tRun\n"
                 "\tE\tErase memory\n"
+                "\tF\tLoad binary file\n"
                 "\tL\tLoad memory\n"
                 "\tS\tSave memory\n"
                 "\tQ\tExit\n\n> "
@@ -156,6 +185,10 @@ char c = 0x00;
             case 'E':
                 printf("\033[J");
                 ClearMemory();
+                break;
+            case 'F':
+                printf("\033[J");
+                LoadBinaryFile();
                 break;
             case 'L':
                 printf("\033[J");
