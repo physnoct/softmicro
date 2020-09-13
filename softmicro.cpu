@@ -48,7 +48,6 @@
 
     #tokendef byte_ops_table
     {
-;        TBD = 0x20
         toa = 0x21
         toh = 0x22
         bcd = 0x23
@@ -155,8 +154,15 @@
     {op: ops_table} --*{dest: reg_table},{src: reg_table} -> {pair = (dest << 4)|src, 0x3e @ op[7:0] @ pair[7:0]}
     {op: ops_table} {dest: reg_table},{src: reg_table}[{disp}] -> {pair = (dest << 4)|src, 0x3b @ op[7:0] @ pair[7:0] @ disp[7:0]}
     {op: ops_table} {dest: reg_table}[{disp}],{src: reg_table} -> {pair = (dest << 4)|src, 0x3f @ op[7:0] @ pair[7:0] @ disp[7:0]}
-    ;TBD size
 
+    {op: ops_table}.{size: size_table} {dest: reg_table},*{src: reg_table}   -> {pair = (dest << 4)|src, size[7:0] @ 0x38 @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} {dest: reg_table},*{src: reg_table}++ -> {pair = (dest << 4)|src, size[7:0] @ 0x39 @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} {dest: reg_table},--*{src: reg_table} -> {pair = (dest << 4)|src, size[7:0] @ 0x3a @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} *{dest: reg_table},{src: reg_table}   -> {pair = (dest << 4)|src, size[7:0] @ 0x3c @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} *{dest: reg_table}++,{src: reg_table} -> {pair = (dest << 4)|src, size[7:0] @ 0x3d @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} --*{dest: reg_table},{src: reg_table} -> {pair = (dest << 4)|src, size[7:0] @ 0x3e @ op[7:0] @ pair[7:0]}
+    {op: ops_table}.{size: size_table} {dest: reg_table},{src: reg_table}[{disp}] -> {pair = (dest << 4)|src, size[7:0] @ 0x3b @ op[7:0] @ pair[7:0] @ disp[7:0]}
+    {op: ops_table}.{size: size_table} {dest: reg_table}[{disp}],{src: reg_table} -> {pair = (dest << 4)|src, size[7:0] @ 0x3f @ op[7:0] @ pair[7:0] @ disp[7:0]}
     ;--------------------------
     ; LD,ADD,ADC,SUB,SBC,
     ; AND,OR,XOR,CP
@@ -322,8 +328,7 @@
     bitc  {dest: reg_table}.{bit} -> {assert(bit<8),param = (bit[2:0] << 4) | dest[3:0], 0x1a @ param[7:0]}
     bits  {dest: reg_table}.{bit} -> {assert(bit<8),param = 0x80 | (bit[2:0] << 4) | dest[3:0], 0x1a @ param[7:0]}
     tog   {dest: reg_table}.{bit} -> {assert(bit<8),param = (bit << 4) | dest[3:0], 0x1b @ param[7:0]}
-    testc {dest: reg_table}.{bit} -> {assert(bit<8),param = (bit << 4) | dest[3:0], 0x1c @ param[7:0]}
-    tests {dest: reg_table}.{bit} -> {assert(bit<8),param = 0x80 | (bit << 4) | dest[3:0], 0x1c @ param[7:0]}
+    test {dest: reg_table}.{bit}  -> {assert(bit<8),param = (bit << 4) | dest[3:0], 0x1c @ param[7:0]}
     waitc {dest: reg_table}.{bit} -> {assert(bit<8),param = (bit << 4) | dest[3:0], 0x1d @ param[7:0]}
     waits {dest: reg_table}.{bit} -> {assert(bit<8),param = 0x80 | (bit << 4) | dest[3:0], 0x1d @ param[7:0]}
 

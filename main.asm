@@ -471,4 +471,28 @@ tests:
 		;cp		b
 		;jr		NC,loop
 
+putstring_imm:
+		;r15 = return add
+		ex.w	r1,*r15
+		ld		r0,*r1++
+
+		_while_cmp(r0,!=,#0)
+			out		(0xff),r0
+		_wh_end
+		ex.w	*r15,r1
+		ret
+
+		call	putstring_imm
+#str	"Hello World! from softmicro.\0"
+
+
+
+
+
+
+
+
+
+
+
 
