@@ -197,7 +197,7 @@ int16_t disp16;
         default:
             illegal_inst();
     }
-    if (step_mode) printf("get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
+    if (step_mode) printw("get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
     return disp16;
 }
 
@@ -228,7 +228,7 @@ int16_t sp;
     app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
     app_memory[(sp-2)&0xffff] = value & 0xff;
     setsp(sp-2);
-    if (step_mode) printf("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
+    if (step_mode) printw("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
 }
 
 int16_t get_retaddr(void)
@@ -238,7 +238,7 @@ int16_t sp;
     sp = getsp();
     setsp(sp+2);
 
-    if (step_mode) printf("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
+    if (step_mode) printw("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
     return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
 }
 
@@ -248,7 +248,7 @@ uint16_t sp;
 
     sp = (getsp() - 1) & 0xffff;
 
-    if (step_mode) printf("push_byte:\tSP: %04X\n",sp);
+    if (step_mode) printw("push_byte:\tSP: %04X\n",sp);
     app_memory[sp] = my_byte;
     setsp(sp);
 }
@@ -275,7 +275,7 @@ uint8_t test_bit,test_mask,test;
     test_mask = 1 << test_bit;
     test = (param & 0x01) << test_bit;
 
-    if (step_mode) printf("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
+    if (step_mode) printw("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
 
     if ((app_flags & test_mask) == test)
     {
@@ -315,7 +315,7 @@ int16_t temp;
     put_retaddr(app_pc + app_size); // next instruction after call
     temp = get_disp();
     app_pc += temp;
-    if (step_mode) printf("BSR %04X (%04X)\n",temp, app_pc);
+    if (step_mode) printw("BSR %04X (%04X)\n",temp, app_pc);
 }
 
 void br_always(void)
@@ -323,7 +323,7 @@ void br_always(void)
 int16_t temp;
 
     temp = get_disp();
-    if (step_mode) printf("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) printw("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
     app_pc = app_pc + app_size + temp;
 }
 
@@ -342,11 +342,11 @@ int result;
 
     do
     {
-        printf("WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
-        result = scanf("%02X",&input);
-        printf("Result: %02X, Input: %02X\n",result,input & 0xff);
-        printf("Mask: %02X, Value: %02X\n",mask,value);
-        if ((input & mask) == value) printf("Bit match\n");
+        printw("WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
+        result = scanw("%02X",&input);
+        printw("Result: %02X, Input: %02X\n",result,input & 0xff);
+        printw("Mask: %02X, Value: %02X\n",mask,value);
+        if ((input & mask) == value) printw("Bit match\n");
     } while ((input & mask) != value);
 }
 
@@ -363,7 +363,7 @@ void djnz(uint8_t param)
 int16_t temp;
 
     temp = get_disp();
-    if (step_mode) printf("DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) printw("DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
 
     app_reg[param][0] -= 1;
 
@@ -419,7 +419,7 @@ void dec(uint8_t param)
 
 void sfl(uint8_t param)
 {
-    if (step_mode) printf("SFL: param: %02X\n",param);
+    if (step_mode) printw("SFL: param: %02X\n",param);
     if (adr_mode == 0)
     {
         setflags(app_reg[param]);
@@ -540,7 +540,7 @@ uint8_t pair,bit,reg,val;
         case 0:
             if (val != get_bit_val(bit,app_reg[reg][0]))
             {
-                printf("Waiting for bit %d of reg %d to be %d\n",bit,reg,val>>7);
+                printw("Waiting for bit %d of reg %d to be %d\n",bit,reg,val>>7);
                 getchar();
             }
             break;

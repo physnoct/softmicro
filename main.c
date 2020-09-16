@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <ncurses.h>
+#include <signal.h>
 
 #include "softmicro.h"
 
-//Project status: en cours,
+static void finish(int sig);
 
 void PrintBinary2(uint8_t data)
 {
@@ -13,7 +14,7 @@ int i=8;
 
     do
     {
-        printf("%d ",(data >> (i-1)) & 1);
+        printw("%d ",(data >> (i-1)) & 1);
     } while (--i);
 }
 
@@ -24,30 +25,30 @@ uint16_t sp;
     sp = getsp();
 
     /* Restore cursor position */
-    printf("Size: %d, Address mode: %02X\n",app_size,adr_mode);
-    printf("PC: %04X:",app_pc & 0xFFFF);
+    printw("Size: %d, Address mode: %02X\n",app_size,adr_mode);
+    printw("PC: %04X:",app_pc & 0xFFFF);
     for (i=0;i<12;i++)
     {
-        printf(" %02X",app_memory[app_pc+i]);
+        printw(" %02X",app_memory[app_pc+i]);
     }
 
-    printf("\nFlags: S T H I V N Z C               \tSP+03: %04X [%02X]\n       ",(sp+3)&0xFFFF,app_memory[(sp+3) & 0xffff]);
+    printw("\nFlags: S T H I V N Z C               \tSP+03: %04X [%02X]\n       ",(sp+3)&0xFFFF,app_memory[(sp+3) & 0xffff]);
     PrintBinary2(app_flags);
 
-    printf("               \tSP+02: %04X [%02X]\n",(sp+2)&0xFFFF,app_memory[(sp+2) & 0xffff]);
-    printf("      f e d c b a 9 8 7 6 5 4 3 2 1 0\tSP+01: %04X [%02X]\n",(sp+1)&0xFFFF,app_memory[(sp+1) & 0xffff]);
+    printw("               \tSP+02: %04X [%02X]\n",(sp+2)&0xFFFF,app_memory[(sp+2) & 0xffff]);
+    printw("      f e d c b a 9 8 7 6 5 4 3 2 1 0\tSP+01: %04X [%02X]\n",(sp+1)&0xFFFF,app_memory[(sp+1) & 0xffff]);
 
     for (i=0;i<16;i++)
     {
-        printf("R%02d: ",i);
+        printw("R%02d: ",i);
 
         for (j=15;j>-1;j--)
         {
-            printf("%02X",app_reg[i][j] & 0xFF);
+            printw("%02X",app_reg[i][j] & 0xFF);
         }
-        printf("\tSP-%02X: %04X [%02X]\n",i,(sp-i)&0xFFFF,app_memory[(sp-i) & 0xffff]);
+        printw("\tSP-%02X: %04X [%02X]\n",i,(sp-i)&0xFFFF,app_memory[(sp-i) & 0xffff]);
     }
-    printf("\n");
+    printw("\n");
 }
 
 void ClrRegisters(void)
@@ -85,12 +86,12 @@ char filename[128];
 long fileSize;
 int result;
 
-    printf("File to open: ");
-    result = scanf("%s",filename);
-    printf("Result: %02X, filename: %s\n",result,filename);
+    printw("File to open: ");
+    result = scanw("%s",filename);
+    printw("Result: %02X, filename: %s\n",result,filename);
 
     fp = fopen(filename,"rb");
-    if (fp == NULL) printf("File %s not found\n",filename);
+    if (fp == NULL) printw("File %s not found\n",filename);
     else
     {
         fseek(fp, 0 , SEEK_END);
@@ -100,7 +101,7 @@ int result;
         if (fileSize > 65536) fileSize = 65536;
 
         fread(app_memory,1,fileSize,fp);
-        printf("File %s loaded\n",filename);
+        printw("File %s loaded\n",filename);
         fclose(fp);
     }
 }
@@ -110,11 +111,11 @@ void LoadMemory(void)
 FILE *p;
 
     p = fopen("memory.bin","rb");
-    if (p == NULL) printf("File memory.bin not found\n");
+    if (p == NULL) printw("File memory.bin not found\n");
     else
     {
         fread(app_memory,1,65536,p);
-        printf("File memory.bin loaded\n");
+        printw("File memory.bin loaded\n");
         fclose(p);
     }
 }
@@ -126,7 +127,7 @@ FILE *p;
     p = fopen("memory.bin","wb+");
 
     fwrite(app_memory,1,65536,p);
-    printf("File memory.bin saved\n");
+    printw("File memory.bin saved\n");
     fclose(p);
 }
 
@@ -140,19 +141,29 @@ int main()
 {
 //int i;
 char c = 0x00;
+bool quit = false;
+
+/* initialize your non-curses data structures here */
+
+    (void) signal(SIGINT, finish);      /* arrange interrupts to terminate */
+
+    (void) initscr();      /* initialize the curses library */
+//    keypad(stdscr, TRUE);  /* enable keyboard mapping */
+    (void) nonl();         /* tell curses not to do NL->CR/NL on output */
+    (void) cbreak();       /* take input chars one at a time, no wait for \n */
+    (void) echo();         /* echo input - in color */
 
     ClrRegisters();
 
-    /* Clear screen, store cursor position */
-    printf("\033c");
+    clear();
 
     do
     {
-        printf("\033[f");
+        move(0,0);
 
         DumpRegisters();
 
-        printf("Soft micro C v1.0\n\n"
+        printw("Soft micro C v1.0\n\n"
                 "\tA\tReset\n"
                 "\tB\tOp Step\n"
                 "\tC\t\n"
@@ -164,19 +175,17 @@ char c = 0x00;
                 "\tQ\tExit\n\n> "
         );
 
-        printf("\033[s\n\r");
-        //c = getchar();
-        //c = getch();
+        c = getch();
+        printw("\n");
+        clrtobot();
 
         switch(toupper(c))
         {
             case 'A':
-                printf("\033[J");
                 ClrRegisters();
                 break;
             case ' ':
             case 'B':
-                printf("\033[J");
                 OpStep();
                 break;
             case 'C':
@@ -185,42 +194,37 @@ char c = 0x00;
                 Run();
                 break;
             case 'E':
-                printf("\033[J");
                 ClearMemory();
                 break;
             case 'F':
-                printf("\033[J");
                 LoadBinaryFile();
                 break;
             case 'L':
-                printf("\033[J");
                 LoadMemory();
                 break;
             case 'S':
-                printf("\033[J");
                 SaveMemory();
                 break;
 
             case 'Q':
-                printf("\033[J");
-                exit(0);
+                quit = true;
+                break;
             default:
             ;
         }
-        printf("\033[u");
-        c = getchar();
 
-        //printf("\033[J");
-/*        printf("\033[s");
-        printf("\033[K                                                 ");
-        printf("\033[K                                                 ");
-        printf("\033[K                                                 ");
-        printf("\033[K                                                 ");
-        printf("\033[K                                                 ");
-        printf("\033[u"); */
+        refresh();
 
-    } while (true);
+    } while (!quit);
 
-    return 0;
+    finish(0);
 }
 
+static void finish(int sig)
+{
+    endwin();
+
+    /* do your non-curses wrapup here */
+
+    exit(0);
+}

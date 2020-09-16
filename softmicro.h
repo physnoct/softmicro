@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <ncurses.h>
+
 #include "routines.h"
 #include "ops.h"
 

@@ -17,7 +17,7 @@ int16_t temp;
 
     op_code = app_memory[app_pc++];
 
-    if (step_mode) printf("OpStep\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
+    if (step_mode) printw("OpStep\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
 
     if (op_code >= 0x40)
     {
@@ -93,14 +93,14 @@ int16_t temp;
                 put_retaddr(app_pc + 2); // next instruction after call
                 app_pc = getword(app_pc);
                 temp = getsp();
-                if (step_mode) printf("CALL %04X, SP: %04X, Ret Addr %04X\n",app_pc,temp & 0xffff,app_memory[(temp+1) & 0xffff]*256+app_memory[temp & 0xffff]);
+                if (step_mode) printw("CALL %04X, SP: %04X, Ret Addr %04X\n",app_pc,temp & 0xffff,app_memory[(temp+1) & 0xffff]*256+app_memory[temp & 0xffff]);
                 break;
             case 0x09: //BSR
                 br_sbr();
                 break;
             case 0x0a: //JMP
                 app_pc = getword(app_pc);
-                if (step_mode) printf("JMP %04X\n",app_pc);
+                if (step_mode) printw("JMP %04X\n",app_pc);
                 break;
             case 0x0b: //BR
                 br_always();
@@ -109,22 +109,22 @@ int16_t temp;
             /* Size prefix */
             case 0x0c: //.W
                 app_size = 2;
-                if (step_mode) printf(".W\n");
+                if (step_mode) printw(".W\n");
                 OpStep2();
                 break;
             case 0x0d: //.D
                 app_size = 4;
-                if (step_mode) printf(".D\n");
+                if (step_mode) printw(".D\n");
                 OpStep2();
                 break;
             case 0x0e: //.Q
                 app_size = 8;
-                if (step_mode) printf(".Q\n");
+                if (step_mode) printw(".Q\n");
                 OpStep2();
                 break;
             case 0x0f: //.O
                 app_size = 16;
-                if (step_mode) printf(".O\n");
+                if (step_mode) printw(".O\n");
                 OpStep2();
                 break;
             case 0x10: //LD
@@ -270,7 +270,7 @@ uint8_t op_code,param;
 
     op_code = app_memory[app_pc++];
 
-    if (step_mode) printf("OpStep2\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
+    if (step_mode) printw("OpStep2\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
 
     if (op_code >= 0x40)
     {
@@ -407,7 +407,7 @@ uint8_t op_code,param;
 
     op_code = app_memory[app_pc++];
 
-    if (step_mode) printf("OpStep3\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
+    if (step_mode) printw("OpStep3\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
 
     if (op_code >= 0x70)
     {
@@ -518,7 +518,7 @@ uint8_t op_code; //,param;
 
     op_code = app_memory[app_pc];
 
-    if (step_mode) printf("OpExtended\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
+    if (step_mode) printw("OpExtended\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
 
     switch(op_code)
     {
@@ -537,7 +537,7 @@ uint8_t op_code; //,param;
             break;
         case 0x02: //HALT
             app_pc--;
-            printf("Halt\n");
+            printw("Halt\n");
             step_mode = true;
             break;
         case 0x03: // CLR H
@@ -563,7 +563,7 @@ uint8_t op_code; //,param;
             break;
         case 0x10: // STEP
             step_mode = true;
-            printf("Step\n");
+            printw("Step\n");
             break;
 
         default:

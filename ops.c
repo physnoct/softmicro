@@ -2120,10 +2120,10 @@ uint8_t port;
 int result, val;
 
     port = app_memory[app_pc++];
-    if (step_mode) printf("IN: [%02X] = ",port);
+    if (step_mode) printw("IN: [%02X] = ",port);
 
-    result = scanf("%02X",&val);
-    if (step_mode) printf("Result: %02X, Input: %02X\n",result,val & 0xff);
+    result = scanw("%02X",&val);
+    if (step_mode) printw("Result: %02X, Input: %02X\n",result,val & 0xff);
 
     if ((adr_mode & 0xf0) == 0xF0)
     {
@@ -2148,7 +2148,18 @@ uint8_t port,val;
     {
         val = app_reg[0][0];
     }
-    if (step_mode) printf("OUT: [%02X] = %02X\n",port,val);
+    if (step_mode)
+    {
+        printw("OUT: [%02X] = %02X\n",port,val);
+    }
+    else
+    {
+        if (port == 0xFF)
+        {
+            addch(val);
+            refresh();
+        }
+    }
 }
 
 /*
@@ -2171,7 +2182,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printf("ASX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) printw("ASX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {
@@ -2222,7 +2233,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printf("ROX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) printw("ROX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {
@@ -2267,7 +2278,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printf("LSX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) printw("LSX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {
