@@ -523,7 +523,7 @@ uint8_t op_code; //,param;
     switch(op_code)
     {
         case 0x00: //VER
-            app_reg[0][0] = 1;
+            app_reg[0][0] = SOFT_MICRO_INST_SET_VERSION;
             break;
         case 0x01: //SN
             app_reg[0][0] = 0xEF;
@@ -565,7 +565,11 @@ uint8_t op_code; //,param;
             step_mode = true;
             printw("Step\n");
             break;
-
+        case 0x20: // VASM
+            app_pc++;
+            app_reg[0][1] = app_memory[app_pc++];
+            printw("Assembler instruction set version: %d\n",app_reg[0][1]);
+            break;
         default:
             illegal_inst();
     }

@@ -6,6 +6,8 @@
 
 #include "softmicro.h"
 
+char filename[128] = "memory.bin";
+
 static void finish(int sig);
 
 void PrintBinary2(uint8_t data)
@@ -82,7 +84,6 @@ int i;
 void LoadBinaryFile(void)
 {
 FILE *fp;
-char filename[128];
 long fileSize;
 int result;
 
@@ -110,12 +111,12 @@ void LoadMemory(void)
 {
 FILE *p;
 
-    p = fopen("memory.bin","rb");
-    if (p == NULL) printw("File memory.bin not found\n");
+    p = fopen(filename,"rb");
+    if (p == NULL) printw("File %s not found\n",filename);
     else
     {
         fread(app_memory,1,65536,p);
-        printw("File memory.bin loaded\n");
+        printw("File %s loaded\n",filename);
         fclose(p);
     }
 }
@@ -124,10 +125,10 @@ void SaveMemory(void)
 {
 FILE *p;
 
-    p = fopen("memory.bin","wb+");
+    p = fopen(filename,"wb+");
 
     fwrite(app_memory,1,65536,p);
-    printw("File memory.bin saved\n");
+    printw("File %s saved\n",filename);
     fclose(p);
 }
 
@@ -163,7 +164,7 @@ bool quit = false;
 
         DumpRegisters();
 
-        printw("Soft micro C v1.0\n\n"
+        printw("Soft micro C v1.0, Inst set: %d\n\n"
                 "\tA\tReset\n"
                 "\tB\tOp Step\n"
                 "\tC\t\n"
@@ -172,7 +173,8 @@ bool quit = false;
                 "\tF\tLoad binary file\n"
                 "\tL\tLoad memory\n"
                 "\tS\tSave memory\n"
-                "\tQ\tExit\n\n> "
+                "\tQ\tExit\n\n> ",
+                SOFT_MICRO_INST_SET_VERSION
         );
 
         c = getch();

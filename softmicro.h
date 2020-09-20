@@ -10,6 +10,7 @@
 #include "routines.h"
 #include "ops.h"
 
+#define SOFT_MICRO_INST_SET_VERSION 1
 #define VECTOR_TABLE_BEGIN 0xFFE0
 
 void OpStep(void);
