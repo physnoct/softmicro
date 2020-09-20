@@ -6,6 +6,7 @@ uint8_t app_flags;
 int16_t app_pc;
 uint8_t app_size,adr_mode;
 bool step_mode = true;
+bool run_until_ret = false;
 
 void OpStep(void)
 {
@@ -77,6 +78,7 @@ int16_t temp;
                 app_flags |= FLAG_I_MASK;
                 break;
             case 0x04: //RET
+                run_until_ret = false;
                 app_pc = get_retaddr();
                 break;
             case 0x05: //RETI

@@ -132,6 +132,14 @@ FILE *p;
     fclose(p);
 }
 
+void RunToNextReturn(void)
+{
+    run_until_ret = true;
+    step_mode = false;
+    while (run_until_ret) OpStep();
+    step_mode = true;
+}
+
 void Run(void)
 {
     step_mode = false;
@@ -166,8 +174,8 @@ bool quit = false;
 
         printw("Soft micro C v1.0, Inst set: %d\n\n"
                 "\tA\tReset\n"
-                "\tB\tOp Step\n"
-                "\tC\t\n"
+                "\tB\tStep into\n"
+                "\tC\tRun to next return\n"
                 "\tD\tRun\n"
                 "\tE\tErase memory\n"
                 "\tF\tLoad binary file\n"
@@ -191,6 +199,7 @@ bool quit = false;
                 OpStep();
                 break;
             case 'C':
+                RunToNextReturn();
                 break;
             case 'D':
                 Run();
