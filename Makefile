@@ -10,7 +10,7 @@ OBJ = main.hex
 
 INCLUDES = bios.inc
 
-AWKPATH = .
+AWKPATH = ../struct
 STRUCT = $(AWKPATH)/struct_softmicro.awk
 
 STRUCT_FILES = struct_softmicro.awk struct_cond.awk struct_macros.awk struct_tests.awk
@@ -43,9 +43,9 @@ $(PGM).bin: $(PGM).hex
 	hex2bin -b $(PGM).hex
 
 load:
-	cp main.hex /dev/ttyS0
+	cp $(PGM).bin ~/tmp/memory.bin
 
-install:
-	cp $(STRUCT_FILES) $(AWKPATH)
-	cp gawk.sh /etc/profile.d
+#install:
+#	cp $(STRUCT_FILES) $(AWKPATH)
+#	cp gawk.sh /etc/profile.d
 
