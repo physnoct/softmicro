@@ -2,6 +2,7 @@
 
 #cpudef
 {
+
     #bits 8
 
     #tokendef reg_table
@@ -92,6 +93,12 @@
         ts = 0xd
         sc = 0xe
         ss = 0xf
+    }
+
+    vasm ->
+    {
+        assembler_version = 1
+        0x30 @ 0x20 @ assembler_version[7:0]
     }
 
     nop         -> 0x00
@@ -347,4 +354,5 @@
     ver         -> 0x30 @ 0x00
     sern        -> 0x30 @ 0x01
     halt        -> 0x30 @ 0x02
+    step        -> 0x30 @ 0x10
 }
