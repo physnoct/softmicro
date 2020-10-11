@@ -1,12 +1,41 @@
 #include "softmicro.h"
 
+uint8_t reg_pair,src,dest;
+
+void getPair(void)
+{
+    reg_pair = app_memory[app_pc++];
+    src = reg_pair & 0x0f;
+    dest = (reg_pair & 0xf0)>>4;
+}
+
 void illegal_inst(void)
 {
+int i;
+
+    // If running we stop here
+    step_mode = true;
+    printw("Illegal instruction: size: %d, addr mode: %02X\n",app_size,adr_mode);
+    for (i=0;i<11;i++)
+    {
+        printw("%02X ",app_memory[app_pc + i]);
+    }
+    printw("\n");
 }
 
 bool bool_xor(bool a, bool b)
 {
     return (a && !b)||(!a && b);
+}
+
+uint8_t high(uint16_t value)
+{
+    return (value >> 8) & 0xff;
+}
+
+uint8_t low(uint16_t value)
+{
+    return value & 0xff;
 }
 
 uint8_t get_cy(void)
@@ -228,7 +257,7 @@ int16_t sp;
     app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
     app_memory[(sp-2)&0xffff] = value & 0xff;
     setsp(sp-2);
-    if (step_mode) printw("value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
+    if (step_mode) printw("PUT RET ADDR: value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
 }
 
 int16_t get_retaddr(void)
@@ -325,6 +354,75 @@ int16_t temp;
     temp = get_disp();
     if (step_mode) printw("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
     app_pc = app_pc + app_size + temp;
+}
+
+void bsr_cond(uint8_t param)
+{
+int16_t disp;
+uint8_t test_bit,test_mask,test;
+
+    // Bit 3-1  flag
+    // Bit 0    0:clear 1:set
+    test_bit = (param & 0x0E) >> 1;
+    test_mask = 1 << test_bit;
+    test = (param & 0x01) << test_bit;
+
+    disp = get_disp();
+
+    if (step_mode) printw("BSR: bit: %d, mask: %02X, test: %d, disp %04X\n",test_bit, test_mask, test, disp);
+
+    if ((app_flags & test_mask) == test)
+    {
+        put_retaddr(app_pc + app_size); // next instruction after call
+        app_pc += disp;
+        if (step_mode) printw("BSR %04X (%04X)\n",disp, app_pc);
+    }
+    else
+    {
+        app_pc += app_size;
+    }
+}
+
+void mcpdr(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    do
+    {
+        app_memory[adr_dest--] = app_memory[adr_src--];
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
+}
+
+void mcpir(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    printw("MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+
+    do
+    {
+        app_memory[adr_dest++] = app_memory[adr_src++];
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
 }
 
 /* Wait until port bit n = 0
@@ -426,6 +524,84 @@ void sfl(uint8_t param)
     }
     else
     {
+    }
+}
+
+void push(uint8_t param)
+{
+    // MSB to LSB
+    for (int i=app_size-1;i>=0;i--)
+    {
+        push_byte(app_reg[param][i]);
+    }
+}
+
+void pop(uint8_t param)
+{
+    // LSB to MSB
+    for (int i=0;i<app_size;i++)
+    {
+        app_reg[param][i] = pop_byte();
+    }
+}
+
+void ind_call(uint8_t param)
+{
+    switch(adr_mode & 0xF0)
+    {
+        case 0xE0: // (r)
+            put_retaddr(app_pc);
+            app_pc = get_addr(param);
+            break;
+        case 0xF0: // (table)[r]
+            put_retaddr(app_pc+2);
+            //get table pointer (reuse app_pc)
+            if (step_mode) printw("IND CALL (table): PC: %04X\n",app_pc);
+            app_pc = getword(app_pc) + get_addr(param)*2;
+            if (step_mode) printw("(table)[r]: %04X, %04X\n",app_pc,getword(app_pc));
+            //get address from table
+            app_pc = getword(app_pc);
+            break;
+        default:
+            illegal_inst();
+    }
+}
+
+void ind_bsr(uint8_t param)
+{
+    switch(adr_mode & 0xF0)
+    {
+        case 0xE0: // (r)
+            put_retaddr(app_pc + 2); // next instruction after call
+            app_pc = get_addr(param);
+            break;
+        case 0xF0: // (table)[r]
+            switch(app_size)
+            {
+                case 1:
+                    put_retaddr(app_pc + 1); // next instruction after call
+                    printw("BSR (r): PC: %04X, MEM: %02X\n",app_pc,app_memory[app_pc]);
+                    //get table pointer (reuse app_pc)
+                    app_pc = app_pc +1 + app_memory[app_pc] + get_addr(param)*2;
+                    printw("table: %04X\n",app_pc);
+                    //get address from table
+                    app_pc = getword(app_pc);
+                    printw("value: %04X\n",app_pc);
+                    break;
+                case 2:
+                    put_retaddr(app_pc + 2); // next instruction after call
+                    //get table pointer (reuse app_pc)
+                    app_pc = app_pc + getword(app_pc) + get_addr(param)*2;
+                    //get address from table
+                    app_pc = getword(app_pc);
+                    break;
+                default:
+                    illegal_inst();
+            }
+//            app_pc = getword(app_pc) + get_addr(src)*2;
+            break;
+        default:
+            illegal_inst();
     }
 }
 
@@ -546,6 +722,26 @@ uint8_t pair,bit,reg,val;
             break;
         default:
             illegal_inst();
+    }
+}
+
+void op_rand(void)
+{
+int i;
+
+    for (i=0;i<app_size;i++)
+    {
+        app_reg[0][i] = rand() & 0xFF;
+    }
+}
+
+void push_imm(void)
+{
+int i;
+
+    for (i=0;i<app_size;i++)
+    {
+        push_byte(app_memory[(app_pc++) & 0xffff]);
     }
 }
 

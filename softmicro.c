@@ -22,7 +22,7 @@ int16_t temp;
 
     if (op_code >= 0x40)
     {
-        if  (op_code >= 0xC0)
+        if  (op_code >= 0xE0)
         {
             adr_mode = op_code;
             OpStep3();
@@ -54,8 +54,14 @@ int16_t temp;
                 case 0xA0:
                     dec(param);
                     break;
-                case 0xb0:
+                case 0xB0:
                     sfl(param);
+                    break;
+                case 0xC0:
+                    push(param);
+                    break;
+                case 0xD0:
+                    pop(param);
                     break;
                 default:
                 ;
@@ -179,18 +185,22 @@ int16_t temp;
                 op_out();
                 break;
 
+            case 0x20: // CLR C
+                app_flags &= ~FLAG_C_MASK;
+                break;
+            case 0x21: // SET C
+                app_flags |= FLAG_C_MASK;
+                break;
+            case 0x22: // TOG C
+                app_flags ^= FLAG_C_MASK;
+                break;
+
             /* Unary ops */
-            case 0x21: // TOA
+            case 0x23: // TOA
                 app_reg[0][0] = toa_byte(app_reg[0][0]);
                 break;
-            case 0x22: // TOH
+            case 0x24: // TOH
                 app_reg[0][0] = toh_byte(app_reg[0][0]);
-                break;
-            case 0x23: // BCD
-                app_reg[0][0] = bcd_byte(app_reg[0][0]);
-                break;
-            case 0x24: // BIN
-                app_reg[0][0] = bin_byte(app_reg[0][0]);
                 break;
             case 0x25: // LDF
                 app_reg[0][0] = app_flags;
@@ -234,19 +244,8 @@ int16_t temp;
             case 0x31: // BRLT
                 branch2(op_code);
                 break;
-            case 0x32: // CLR C
-                app_flags &= ~FLAG_C_MASK;
-                break;
-            case 0x33: // SET C
-                app_flags |= FLAG_C_MASK;
-                break;
-            case 0x34: // TOG C
-                app_flags ^= FLAG_C_MASK;
-                break;
-            case 0x35: // Counter prefix dec
-            case 0x36: // Counter prefix inc
-                // TBD
-                break;
+            case 0x35:
+            case 0x36:
             case 0x37:
             case 0x38:
             case 0x39:
@@ -276,7 +275,7 @@ uint8_t op_code,param;
 
     if (op_code >= 0x40)
     {
-        if  (op_code >= 0xC0)
+        if  (op_code >= 0xE0)
         {
             /* address prefix */
             adr_mode = op_code;
@@ -305,6 +304,12 @@ uint8_t op_code,param;
                     break;
                 case 0xb0:
                     sfl(param);
+                    break;
+                case 0xC0:
+                    push(param);
+                    break;
+                case 0xD0:
+                    pop(param);
                     break;
                 default:
                     illegal_inst();
@@ -380,9 +385,14 @@ uint8_t op_code,param;
                 op_lsx();
                 break;
 
+            case 0x30: // Extended
+                OpExtended();
+                break;
             case 0x31: //BRLT
                 branch2(op_code);
                 break;
+            case 0x35:
+            case 0x36:
             case 0x37:
             case 0x38:
             case 0x39:
@@ -413,47 +423,45 @@ uint8_t op_code,param;
 
     if (op_code >= 0x70)
     {
-        if  (op_code >= 0xC0)
-        {
-            illegal_inst();
-        }
-        else
-        {
-            param = op_code & 0x0f;
+        param = op_code & 0x0f;
 
-            switch(op_code & 0xf0)
-            {
-                case 0x60:
-                    branch(param);
-                    break;
-                case 0x70:
-                    djnz(param);
-                    break;
+        switch(op_code & 0xf0)
+        {
+            case 0x60:
+                branch(param);
+                break;
+            case 0x70:
+                djnz(param);
+                break;
 /*
-                case 0x80:
-                    clr(param);
-                    break;
-                case 0x90:
-                    inc(param);
-                    break;
-                case 0xA0:
-                    dec(param);
-                    break;
-                case 0xb0:
-                    sfl(param);
-                    break;
+            case 0x80:
+                clr(param);
+                break;
+            case 0x90:
+                inc(param);
+                break;
+            case 0xA0:
+                dec(param);
+                break;
+            case 0xb0:
+                sfl(param);
+                break;
 */
-                default:
-                    illegal_inst();
-            }
+            default:
+                illegal_inst();
         }
     }
     else
     {
+        param = adr_mode & 0x0f;
+
         switch(op_code)
         {
             case 0x08: //CALL
-                //TBD
+                ind_call(param);
+                break;
+            case 0x09: //BSR
+                ind_bsr(param);
                 break;
             case 0x0a: //JMP
                 //TBD
@@ -516,63 +524,96 @@ uint8_t op_code,param;
 
 void OpExtended(void)
 {
-uint8_t op_code; //,param;
+uint8_t op_code,param;
 
-    op_code = app_memory[app_pc];
+    op_code = app_memory[app_pc++];
 
     if (step_mode) printw("OpExtended\tSize: %d, Addr mode: %02X, Op: %02X\n",app_size,adr_mode,op_code);
 
-    switch(op_code)
+    if (op_code >= 0x60)
     {
-        case 0x00: //VER
-            app_reg[0][0] = SOFT_MICRO_INST_SET_VERSION;
-            break;
-        case 0x01: //SN
-            app_reg[0][0] = 0xEF;
-            app_reg[0][1] = 0xBE;
-            app_reg[0][2] = 0xAD;
-            app_reg[0][3] = 0xDE;
-            app_reg[0][4] = 0xBE;
-            app_reg[0][5] = 0xBA;
-            app_reg[0][6] = 0xED;
-            app_reg[0][7] = 0xFE;
-            break;
-        case 0x02: //HALT
-            app_pc--;
-            printw("Halt\n");
-            step_mode = true;
-            break;
-        case 0x03: // CLR H
-            app_flags &= ~FLAG_H_MASK;
-            break;
-        case 0x04: // SET H
-            app_flags |= FLAG_H_MASK;
-            break;
-        case 0x05: // TOG H
-            app_flags ^= FLAG_H_MASK;
-            break;
-        case 0x06: // CLR T
-            app_flags &= ~FLAG_T_MASK;
-            break;
-        case 0x07: // SET T
-            app_flags |= FLAG_T_MASK;
-            break;
-        case 0x08: // TOG T
-            app_flags ^= FLAG_T_MASK;
-            break;
-        case 0x09: // DAA
-            app_reg[0][0] = daa_byte(app_reg[0][0]);
-            break;
-        case 0x10: // STEP
-            step_mode = true;
-            printw("Step\n");
-            break;
-        case 0x20: // VASM
-            app_pc++;
-            app_reg[0][1] = app_memory[app_pc++];
-            printw("Assembler instruction set version: %d\n",app_reg[0][1]);
-            break;
-        default:
-            illegal_inst();
+        param = op_code & 0x0f;
+
+        switch(op_code & 0xf0)
+        {
+            case 0x60:
+                bsr_cond(param);
+                break;
+            case 0xE0:
+                mcpdr(param);
+                break;
+            case 0xF0:
+                mcpir(param);
+                break;
+            default:
+                illegal_inst();
+        }
+    }
+    else
+    {
+        switch(op_code)
+        {
+            case 0x00: //VER
+                app_reg[0][0] = SOFT_MICRO_INST_SET_VERSION;
+                break;
+            case 0x01: //SN
+                app_reg[0][0] = 0xEF;
+                app_reg[0][1] = 0xBE;
+                app_reg[0][2] = 0xAD;
+                app_reg[0][3] = 0xDE;
+                app_reg[0][4] = 0xBE;
+                app_reg[0][5] = 0xBA;
+                app_reg[0][6] = 0xED;
+                app_reg[0][7] = 0xFE;
+                break;
+            case 0x02: //HALT
+                app_pc-=2;
+                printw("Halt\n");
+                step_mode = true;
+                break;
+            case 0x03: // CLR H
+                app_flags &= ~FLAG_H_MASK;
+                break;
+            case 0x04: // SET H
+                app_flags |= FLAG_H_MASK;
+                break;
+            case 0x05: // TOG H
+                app_flags ^= FLAG_H_MASK;
+                break;
+            case 0x06: // CLR T
+                app_flags &= ~FLAG_T_MASK;
+                break;
+            case 0x07: // SET T
+                app_flags |= FLAG_T_MASK;
+                break;
+            case 0x08: // TOG T
+                app_flags ^= FLAG_T_MASK;
+                break;
+            case 0x09: // BCD
+                app_reg[0][0] = bcd_byte(app_reg[0][0]);
+                break;
+            case 0x0A: // BIN
+                app_reg[0][0] = bin_byte(app_reg[0][0]);
+                break;
+            case 0x0B: // RAND
+                op_rand();
+                break;
+            case 0x10: // STEP
+                step_mode = true;
+                printw("Step\n");
+                break;
+            case 0x11: // PUSH PC
+                put_retaddr(app_pc-2);
+                break;
+            case 0x12: // PUSH IMM
+                push_imm();
+                break;
+            case 0x20: // VASM
+                app_reg[0][1] = app_memory[app_pc++];
+                printw("Assembler instruction set version: %d\n",app_reg[0][1]);
+                break;
+            default:
+                illegal_inst();
+        }
     }
 }
