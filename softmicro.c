@@ -551,6 +551,9 @@ uint8_t op_code,param;
             case 0x60:
                 bsr_cond(param);
                 break;
+            case 0xD0:
+                mswap(param);
+                break;
             case 0xE0:
                 mcpdr(param);
                 break;
@@ -617,6 +620,9 @@ uint8_t op_code,param;
             case 0x20: // VASM
                 app_reg[0][1] = app_memory[app_pc++];
                 printw("Assembler instruction set version: %d\n",app_reg[0][1]);
+                break;
+            case 0x21: // MFILL
+                mfill();
                 break;
             default:
                 illegal_inst();

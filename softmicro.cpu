@@ -469,8 +469,14 @@
     }
 
     ;--------------------------
-    ; MCPIR,MCPDR
+    ; MSWAP,MCPIR,MCPDR,MFILL
     ;--------------------------
+    mswap ({dest: reg_table},{src: reg_table}),{ctr: reg_table} ->
+    {
+        pair = (dest << 4)|src, inst = 0xD0 | ctr,
+        0x30 @ inst[7:0] @ pair[7:0]
+    }
+
     mcpdr ({dest: reg_table},{src: reg_table}),{ctr: reg_table} ->
     {
         pair = (dest << 4)|src, inst = 0xE0 | ctr,
@@ -481,6 +487,13 @@
     {
         pair = (dest << 4)|src, inst = 0xF0 | ctr,
         0x30 @ inst[7:0] @ pair[7:0]
+    }
+
+    mfill ({start: reg_table},{end: reg_table}),#{value} ->
+    {
+        assert(value <= 0xff),
+        pair = (start << 4)|end,
+        0x30 @ 0x21 @ pair[7:0] @ value[7:0]
     }
 
     ;--------------------------

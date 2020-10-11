@@ -425,6 +425,31 @@ uint16_t adr_src,adr_dest;
     set_addr(dest,adr_dest);
 }
 
+void mswap(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+uint8_t temp;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    printw("MSWAP: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+
+    do
+    {
+        temp = app_memory[adr_dest];
+        app_memory[adr_dest++] = app_memory[adr_src];
+        app_memory[adr_src++] = temp;
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
+}
+
 /* Wait until port bit n = 0
 Once instruction is read, execute a port read until condition is met */
 void wait_port(uint8_t param)
@@ -748,4 +773,20 @@ int i;
 void popn(void)
 {
     setsp(getsp() + app_memory[(app_pc++) & 0xffff]);
+}
+
+void mfill(void)
+{
+uint8_t value;
+uint16_t begin,end,i;
+
+    getPair();
+    begin = get_addr(src);
+    end = get_addr(dest);
+    value = app_memory[(app_pc++) & 0xffff];
+
+    for (i = begin; i <= end; i++)
+    {
+        app_memory[i] = value;
+    }
 }

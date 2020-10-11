@@ -47,6 +47,7 @@ void br_always(void);
 void bsr_cond(uint8_t param);
 void mcpdr(uint8_t param);
 void mcpir(uint8_t param);
+void mswap(uint8_t param);
 
 void wait_port(uint8_t param);
 void app_vector(uint8_t param);
@@ -71,6 +72,7 @@ void wait_bit(void);
 void op_rand(void);
 void push_imm(void);
 void popn(void);
+void mfill(void);
 
 #endif // _ROUTINES_H_
 
