@@ -70,6 +70,7 @@ void test_bit(void);
 void wait_bit(void);
 void op_rand(void);
 void push_imm(void);
+void popn(void);
 
 #endif // _ROUTINES_H_
 

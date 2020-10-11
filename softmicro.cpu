@@ -101,8 +101,8 @@
     }
 
     nop         -> 0x00
-    di          -> 0x02
-    ei          -> 0x03
+    di          -> 0x33
+    ei          -> 0x34
     ret         -> 0x04
     reti        -> 0x05
     pushf       -> 0x06
@@ -163,12 +163,12 @@
     br.w {addr} -> {disp = addr-(pc+2), assert(disp <= 0xffff), 0x0C @ 0x0B @ disp[7:0] @ disp[15:8]}
 
     br{flag: flags_table} {addr}   -> {disp = addr-(pc+2), assert(disp <= 0xff), inst = 0x60 | flag, inst[7:0] @ disp[7:0]}
-    brge {addr} -> {disp = addr-(pc+2), assert(disp <= 0xff), 0x01 @ disp[7:0]}
     brlt {addr} -> {disp = addr-(pc+2), assert(disp <= 0xff), 0x31 @ disp[7:0]}
+    brge {addr} -> {disp = addr-(pc+2), assert(disp <= 0xff), 0x32 @ disp[7:0]}
 
     br{flag: flags_table}.w {addr}   -> {disp = addr-(pc+2), assert(disp <= 0xffff), inst = 0x60 | flag, 0x0C @ inst[7:0] @ disp[7:0] @ disp[15:8]}
-    brge.w {addr} -> {disp = addr-(pc+2), assert(disp <= 0xffff), 0x0C @ 0x01 @ disp[ 7:0] @ disp[15:8]}
     brlt.w {addr} -> {disp = addr-(pc+2), assert(disp <= 0xffff), 0x0C @ 0x31 @ disp[ 7:0] @ disp[15:8]}
+    brge.w {addr} -> {disp = addr-(pc+2), assert(disp <= 0xffff), 0x0C @ 0x32 @ disp[ 7:0] @ disp[15:8]}
 
     ;--------------------------
     ; DJNZ
@@ -420,6 +420,8 @@
     ;--------------------------
     ; PUSH,POP
     ;--------------------------
+    push pc     -> 0x01
+
     push {reg: reg_table} -> {inst = 0xC0 | reg[3:0], inst[7:0]}
     pop {reg: reg_table} -> {inst = 0xD0 | reg[3:0], inst[7:0]}
     push.{size: size_table} {reg: reg_table} -> {inst = 0xC0 | reg[3:0], size[7:0] @ inst[7:0]}
@@ -429,35 +431,41 @@
     push #{value} ->
     {
         assert(value <= 0xff),
-        0x30 @ 0x12 @ value[ 7: 0]
+        0x02 @ value[ 7: 0]
     }
 
     push.w #{value} ->
     {
         assert(value <= 0xffff),
-        0x0c @ 0x30 @ 0x12 @ value[ 7: 0] @ value[15: 8]
+        0x0c @ 0x02 @ value[ 7: 0] @ value[15: 8]
     }
 
     push.d #{value} -> {
         assert(value <= 0xffffffff),
-        0x0d @ 0x30 @ 0x12 @
+        0x0d @ 0x02 @
             value[ 7: 0] @ value[15: 8] @ value[23:16] @ value[31:24]
     }
 
     push.q #{value} -> {
         assert(value <= 0xffffffffffffffff),
-        0x0e @ 0x30 @ 0x12 @
+        0x0e @ 0x02 @
             value[ 7: 0] @ value[15: 8] @ value[23:16] @ value[31:24] @
             value[39:32] @ value[47:40] @ value[55:48] @ value[63:56]
     }
 
     push.o #{value} -> {
         assert(value <= 0xffffffffffffffffffffffffffffffff),
-        0x0f @ 0x30 @ 0x12 @
+        0x0f @ 0x02 @
             value[ 7: 0] @ value[15: 8] @ value[23:16] @ value[31:24] @
             value[39:32] @ value[47:40] @ value[55:48] @ value[63:56] @
             value[71:64] @ value[79:72] @ value[87:80] @ value[95:88] @
             value[103:96] @ value[111:104] @ value[119:112] @ value[127:120]
+    }
+
+    popn #{value} ->
+    {
+        assert(value <= 0xff),
+        0x03 @ value[ 7: 0]
     }
 
     ;--------------------------
@@ -494,5 +502,4 @@
     mul10       -> 0x30 @ 0x0E
 
     step        -> 0x30 @ 0x10
-    push pc     -> 0x30 @ 0x11
 }

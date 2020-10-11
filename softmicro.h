@@ -4,13 +4,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <ncurses.h>
 
 #include "routines.h"
 #include "ops.h"
 
-#define SOFT_MICRO_INST_SET_VERSION 1
+#define SOFT_MICRO_INST_SET_VERSION 2
 #define VECTOR_TABLE_BEGIN 0xFFE0
 
 void OpStep(void);

@@ -74,14 +74,14 @@ int16_t temp;
         {
             case 0x00: //NOP
                 break;
-            case 0x01: //BRGE
-                branch2(op_code);
+            case 0x01: // PUSH PC
+                put_retaddr(app_pc-2);
                 break;
-            case 0x02: //DI
-                app_flags &= ~FLAG_I_MASK;
+            case 0x02: // PUSH IMM
+                push_imm();
                 break;
-            case 0x03: //EI
-                app_flags |= FLAG_I_MASK;
+            case 0x03: // POPN
+                popn();
                 break;
             case 0x04: //RET
                 run_until_ret = false;
@@ -244,6 +244,15 @@ int16_t temp;
             case 0x31: // BRLT
                 branch2(op_code);
                 break;
+            case 0x32: //BRGE
+                branch2(op_code);
+                break;
+            case 0x33: //DI
+                app_flags &= ~FLAG_I_MASK;
+                break;
+            case 0x34: //EI
+                app_flags |= FLAG_I_MASK;
+                break;
             case 0x35:
             case 0x36:
             case 0x37:
@@ -320,8 +329,8 @@ uint8_t op_code,param;
     {
         switch(op_code)
         {
-            case 0x01: //BRGE
-                branch2(op_code);
+            case 0x02: // PUSH IMM
+                push_imm();
                 break;
             case 0x09: //BSR
                 br_sbr();
@@ -389,6 +398,9 @@ uint8_t op_code,param;
                 OpExtended();
                 break;
             case 0x31: //BRLT
+                branch2(op_code);
+                break;
+            case 0x32: //BRGE
                 branch2(op_code);
                 break;
             case 0x35:
@@ -601,12 +613,6 @@ uint8_t op_code,param;
             case 0x10: // STEP
                 step_mode = true;
                 printw("Step\n");
-                break;
-            case 0x11: // PUSH PC
-                put_retaddr(app_pc-2);
-                break;
-            case 0x12: // PUSH IMM
-                push_imm();
                 break;
             case 0x20: // VASM
                 app_reg[0][1] = app_memory[app_pc++];

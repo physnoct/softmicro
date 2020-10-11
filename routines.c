@@ -745,3 +745,7 @@ int i;
     }
 }
 
+void popn(void)
+{
+    setsp(getsp() + app_memory[(app_pc++) & 0xffff]);
+}
