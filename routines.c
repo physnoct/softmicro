@@ -15,12 +15,12 @@ int i;
 
     // If running we stop here
     step_mode = true;
-    printw("Illegal instruction: size: %d, addr mode: %02X\n",app_size,adr_mode);
+    wprintw(wConsole,"Illegal instruction: size: %d, addr mode: %02X\n",app_size,adr_mode);
     for (i=0;i<11;i++)
     {
-        printw("%02X ",app_memory[app_pc + i]);
+        wprintw(wConsole,"%02X ",app_memory[app_pc + i]);
     }
-    printw("\n");
+    wprintw(wConsole,"\n");
 }
 
 bool bool_xor(bool a, bool b)
@@ -226,7 +226,7 @@ int16_t disp16;
         default:
             illegal_inst();
     }
-    if (step_mode) printw("get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
+    if (step_mode) wprintw(wConsole,"get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
     return disp16;
 }
 
@@ -257,7 +257,7 @@ int16_t sp;
     app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
     app_memory[(sp-2)&0xffff] = value & 0xff;
     setsp(sp-2);
-    if (step_mode) printw("PUT RET ADDR: value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
+    if (step_mode) wprintw(wConsole,"PUT RET ADDR: value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
 }
 
 int16_t get_retaddr(void)
@@ -267,7 +267,7 @@ int16_t sp;
     sp = getsp();
     setsp(sp+2);
 
-    if (step_mode) printw("RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
+    if (step_mode) wprintw(wConsole,"RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
     return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
 }
 
@@ -277,7 +277,7 @@ uint16_t sp;
 
     sp = (getsp() - 1) & 0xffff;
 
-    if (step_mode) printw("push_byte:\tSP: %04X\n",sp);
+    if (step_mode) wprintw(wConsole,"push_byte:\tSP: %04X\n",sp);
     app_memory[sp] = my_byte;
     setsp(sp);
 }
@@ -304,7 +304,7 @@ uint8_t test_bit,test_mask,test;
     test_mask = 1 << test_bit;
     test = (param & 0x01) << test_bit;
 
-    if (step_mode) printw("BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
+    if (step_mode) wprintw(wConsole,"BRANCH: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
 
     if ((app_flags & test_mask) == test)
     {
@@ -344,7 +344,7 @@ int16_t temp;
     put_retaddr(app_pc + app_size); // next instruction after call
     temp = get_disp();
     app_pc += temp;
-    if (step_mode) printw("BSR %04X (%04X)\n",temp, app_pc);
+    if (step_mode) wprintw(wConsole,"BSR %04X (%04X)\n",temp, app_pc);
 }
 
 void br_always(void)
@@ -352,7 +352,7 @@ void br_always(void)
 int16_t temp;
 
     temp = get_disp();
-    if (step_mode) printw("BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) wprintw(wConsole,"BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
     app_pc = app_pc + app_size + temp;
 }
 
@@ -369,13 +369,13 @@ uint8_t test_bit,test_mask,test;
 
     disp = get_disp();
 
-    if (step_mode) printw("BSR: bit: %d, mask: %02X, test: %d, disp %04X\n",test_bit, test_mask, test, disp);
+    if (step_mode) wprintw(wConsole,"BSR: bit: %d, mask: %02X, test: %d, disp %04X\n",test_bit, test_mask, test, disp);
 
     if ((app_flags & test_mask) == test)
     {
         put_retaddr(app_pc + app_size); // next instruction after call
         app_pc += disp;
-        if (step_mode) printw("BSR %04X (%04X)\n",disp, app_pc);
+        if (step_mode) wprintw(wConsole,"BSR %04X (%04X)\n",disp, app_pc);
     }
     else
     {
@@ -412,7 +412,7 @@ uint16_t adr_src,adr_dest;
     adr_src = get_addr(src);
     adr_dest = get_addr(dest);
 
-    printw("MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+    wprintw(wConsole,"MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
 
     do
     {
@@ -435,7 +435,7 @@ uint8_t temp;
     adr_src = get_addr(src);
     adr_dest = get_addr(dest);
 
-    printw("MSWAP: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+    wprintw(wConsole,"MSWAP: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
 
     do
     {
@@ -465,11 +465,11 @@ int result;
 
     do
     {
-        printw("WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
+        wprintw(wConsole,"WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
         result = scanw("%02X",&input);
-        printw("Result: %02X, Input: %02X\n",result,input & 0xff);
-        printw("Mask: %02X, Value: %02X\n",mask,value);
-        if ((input & mask) == value) printw("Bit match\n");
+        wprintw(wConsole,"Result: %02X, Input: %02X\n",result,input & 0xff);
+        wprintw(wConsole,"Mask: %02X, Value: %02X\n",mask,value);
+        if ((input & mask) == value) wprintw(wConsole,"Bit match\n");
     } while ((input & mask) != value);
 }
 
@@ -486,7 +486,7 @@ void djnz(uint8_t param)
 int16_t temp;
 
     temp = get_disp();
-    if (step_mode) printw("DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
+    if (step_mode) wprintw(wConsole,"DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
 
     app_reg[param][0] -= 1;
 
@@ -542,7 +542,7 @@ void dec(uint8_t param)
 
 void sfl(uint8_t param)
 {
-    if (step_mode) printw("SFL: param: %02X\n",param);
+    if (step_mode) wprintw(wConsole,"SFL: param: %02X\n",param);
     if (adr_mode == 0)
     {
         setflags(app_reg[param]);
@@ -581,9 +581,9 @@ void ind_call(uint8_t param)
         case 0xF0: // (table)[r]
             put_retaddr(app_pc+2);
             //get table pointer (reuse app_pc)
-            if (step_mode) printw("IND CALL (table): PC: %04X\n",app_pc);
+            if (step_mode) wprintw(wConsole,"IND CALL (table): PC: %04X\n",app_pc);
             app_pc = getword(app_pc) + get_addr(param)*2;
-            if (step_mode) printw("(table)[r]: %04X, %04X\n",app_pc,getword(app_pc));
+            if (step_mode) wprintw(wConsole,"(table)[r]: %04X, %04X\n",app_pc,getword(app_pc));
             //get address from table
             app_pc = getword(app_pc);
             break;
@@ -605,13 +605,13 @@ void ind_bsr(uint8_t param)
             {
                 case 1:
                     put_retaddr(app_pc + 1); // next instruction after call
-                    printw("BSR (r): PC: %04X, MEM: %02X\n",app_pc,app_memory[app_pc]);
+                    wprintw(wConsole,"BSR (r): PC: %04X, MEM: %02X\n",app_pc,app_memory[app_pc]);
                     //get table pointer (reuse app_pc)
                     app_pc = app_pc +1 + app_memory[app_pc] + get_addr(param)*2;
-                    printw("table: %04X\n",app_pc);
+                    wprintw(wConsole,"table: %04X\n",app_pc);
                     //get address from table
                     app_pc = getword(app_pc);
-                    printw("value: %04X\n",app_pc);
+                    wprintw(wConsole,"value: %04X\n",app_pc);
                     break;
                 case 2:
                     put_retaddr(app_pc + 2); // next instruction after call
@@ -741,7 +741,7 @@ uint8_t pair,bit,reg,val;
         case 0:
             if (val != get_bit_val(bit,app_reg[reg][0]))
             {
-                printw("Waiting for bit %d of reg %d to be %d\n",bit,reg,val>>7);
+                wprintw(wConsole,"Waiting for bit %d of reg %d to be %d\n",bit,reg,val>>7);
                 getchar();
             }
             break;

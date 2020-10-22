@@ -111,7 +111,7 @@ int i;
 
 void op_load(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -120,9 +120,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -132,6 +130,30 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = app_memory[addr++];
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = app_memory[addr++];
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -145,10 +167,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -158,9 +177,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src);
 
@@ -173,9 +190,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src) - app_size;
 
@@ -187,10 +202,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -201,9 +214,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest);
 
@@ -214,9 +225,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest);
 
@@ -228,9 +237,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest) - app_size;
 
@@ -243,10 +250,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -261,30 +266,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] = app_memory[addr++];
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr++] = app_reg[reg][i];
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -313,16 +294,14 @@ int i;
 
 void op_ex(void)
 {
-uint8_t pair,src,dest,disp,temp;
+uint8_t disp,temp;
 int16_t addr;
 int i;
 
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -335,27 +314,21 @@ int i;
             switch (adr_mode)
             {
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src);
                     ex_reg_memory(addr,dest);
                     break;
 
                 case 0x3c: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest);
                     ex_reg_memory(addr,src);
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src);
                     addr = ex_reg_memory(addr,dest);
@@ -363,9 +336,7 @@ int i;
                     break;
 
                 case 0x3d: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest);
                     addr = ex_reg_memory(addr,src);
@@ -373,9 +344,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src) - app_size;
                     addr = ex_reg_memory(addr,dest);
@@ -383,9 +352,7 @@ int i;
                     break;
 
                 case 0x3e: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(dest) - app_size;
                     addr = ex_reg_memory(addr,src);
@@ -393,20 +360,16 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
                     ex_reg_memory(addr,dest);
                     break;
 
                 case 0x3f:
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
                     ex_reg_memory(addr,src);
@@ -417,30 +380,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] = app_memory[addr++];
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr++] = app_reg[reg][i];
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         default:
             illegal_inst();
     }
@@ -448,7 +387,7 @@ int i;
 
 void op_add(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -457,9 +396,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             app_reg[dest][0] = byte_add(app_reg[dest][0],app_reg[src][0]);
 
@@ -472,6 +409,43 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    //addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    disp = getword(app_pc) - app_pc;
+                    if (step_mode) wprintw(wConsole,"ADD: base: %04X, disp: %04X, index:%04X\n",app_pc,disp,get_addr(src)*app_size);
+                    addr = app_pc + disp + get_addr(src)*app_size;
+
+                    app_pc +=2;
+
+                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+
+                    //addr = getword(app_pc) + get_addr(src)*app_size;
+                    addr = getword(app_pc); // + get_addr(src)*app_size;
+                    if (step_mode) wprintw(wConsole,"ADD: addr: %04X, disp: %04X\n",addr,get_addr(src)*app_size);
+                    addr += get_addr(src)*app_size;
+
+                    app_pc +=2;
+
+                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -489,9 +463,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src);
 
@@ -504,9 +476,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src);
 
@@ -521,9 +491,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
+                    getPair();
 
                     addr = get_addr(src) - app_size;
 
@@ -537,10 +505,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -553,10 +519,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
@@ -570,10 +533,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
@@ -588,10 +548,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
@@ -607,10 +564,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -629,36 +584,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            app_reg[reg][0] = byte_add(app_reg[reg][0],app_memory[addr++]);
-
-            for (i=1;i<app_size;i++)
-            {
-                app_reg[reg][i] = byte_adc(app_reg[reg][i],app_memory[addr++]);
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
-            addr++;
-
-            for (i=1;i<app_size;i++)
-            {
-                app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
-                addr++;
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             app_reg[reg][0] = byte_add(app_reg[reg][0],app_memory[app_pc++]);
 
@@ -675,7 +600,7 @@ int i;
 
 void op_adc(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -684,9 +609,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -697,6 +620,30 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -711,10 +658,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -724,10 +668,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -739,10 +680,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -753,10 +691,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -767,10 +703,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -781,10 +714,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -796,10 +726,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -812,10 +739,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -831,31 +756,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] = byte_adc(app_reg[reg][i],app_memory[addr++]);
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
-                addr++;
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -870,7 +770,7 @@ int i;
 
 void op_sub(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -879,9 +779,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             app_reg[dest][0] = byte_sub(app_reg[dest][0],app_reg[src][0]);
 
@@ -894,6 +792,34 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -911,10 +837,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -926,10 +849,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -943,10 +863,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -959,10 +876,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -975,10 +890,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
@@ -992,10 +904,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
@@ -1010,10 +919,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
@@ -1029,10 +935,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -1051,36 +955,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            app_reg[reg][0] = byte_sub(app_reg[reg][0],app_memory[addr++]);
-
-            for (i=1;i<app_size;i++)
-            {
-                app_reg[reg][i] = byte_sbc(app_reg[reg][i],app_memory[addr++]);
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
-            addr++;
-
-            for (i=1;i<app_size;i++)
-            {
-                app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
-                addr++;
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             app_reg[reg][0] = byte_sub(app_reg[reg][0],app_memory[app_pc++]);
 
@@ -1097,7 +971,7 @@ int i;
 
 void op_sbc(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -1106,9 +980,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -1119,6 +991,31 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -1133,10 +1030,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1146,10 +1040,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1161,10 +1052,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1175,10 +1063,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -1189,10 +1075,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1203,10 +1086,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1218,10 +1098,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1234,10 +1111,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -1253,31 +1128,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] = byte_sbc(app_reg[reg][i],app_memory[addr++]);
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
-                addr++;
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -1292,7 +1142,7 @@ int i;
 
 void op_cp(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -1303,9 +1153,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             byte_sub(app_reg[dest][0],app_reg[src][0]);
 
@@ -1317,27 +1165,50 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+
+                    for (i=1;i<app_size;i++)
+                    {
+                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
                     app_pc +=2;
 
-                    byte_sub(app_memory[addr],app_memory[app_pc++]);
-                    addr++;
+                    byte_sub(app_memory[addr++],app_memory[app_pc++]);
 
                     //Imm to memory
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr],app_memory[app_pc++]);
-                        addr++;
+                        byte_sbc(app_memory[addr++],app_memory[app_pc++]);
                     }
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -1349,10 +1220,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -1366,10 +1234,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     byte_sub(app_reg[dest][0],app_memory[addr++]);
@@ -1382,10 +1247,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -1398,74 +1261,55 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
-                    byte_sub(app_memory[addr],app_reg[src][0]);
-                    addr++;
+                    byte_sub(app_memory[addr++],app_reg[src][0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr],app_reg[src][i]);
-                        addr++;
+                        byte_sbc(app_memory[addr++],app_reg[src][i]);
                     }
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
-                    byte_sub(app_memory[addr],app_reg[src][0]);
-                    addr++;
+                    byte_sub(app_memory[addr++],app_reg[src][0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr],app_reg[src][i]);
-                        addr++;
+                        byte_sbc(app_memory[addr++],app_reg[src][i]);
                     }
                     set_addr(dest,addr);
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
-                    byte_sub(app_memory[addr],app_reg[src][0]);
-                    addr++;
+                    byte_sub(app_memory[addr++],app_reg[src][0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr],app_reg[src][i]);
-                        addr++;
+                        byte_sbc(app_memory[addr++],app_reg[src][i]);
                     }
 
                     set_addr(dest,addr);
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
-                    byte_sub(app_memory[addr],app_reg[src][0]);
-                    addr++;
+                    byte_sub(app_memory[addr++],app_reg[src][0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr],app_reg[src][i]);
-                        addr++;
+                        byte_sbc(app_memory[addr++],app_reg[src][i]);
                     }
                     break;
 
@@ -1474,36 +1318,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            byte_sub(app_reg[reg][0],app_memory[addr++]);
-
-            for (i=1;i<app_size;i++)
-            {
-                byte_sbc(app_reg[reg][i],app_memory[addr++]);
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            byte_sub(app_memory[addr],app_reg[src][0]);
-            addr++;
-
-            for (i=1;i<app_size;i++)
-            {
-                byte_sbc(app_memory[addr],app_reg[src][i]);
-                addr++;
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             byte_sub(app_reg[reg][0],app_memory[app_pc++]);
 
@@ -1520,7 +1334,7 @@ int i;
 
 void op_and(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -1529,9 +1343,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -1542,6 +1354,30 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] &= app_memory[addr++];
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] &= app_memory[addr++];
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -1555,10 +1391,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1568,10 +1401,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1583,10 +1413,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1597,10 +1424,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(src) + disp * app_size;
 
@@ -1611,10 +1436,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1624,10 +1446,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1638,10 +1457,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1653,10 +1469,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -1671,30 +1485,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] &= app_memory[addr++];
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr++] &= app_reg[reg][i];
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -1709,7 +1499,7 @@ int i;
 
 void op_or(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -1718,9 +1508,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -1731,6 +1519,30 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] |= app_memory[addr++];
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] |= app_memory[addr++];
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -1744,10 +1556,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1757,10 +1566,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1772,10 +1578,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1786,11 +1589,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
                     addr = get_addr(src) + disp * app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1800,10 +1600,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1813,10 +1610,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -1827,10 +1621,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1842,10 +1633,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -1860,30 +1649,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] |= app_memory[addr++];
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr++] |= app_reg[reg][i];
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -1898,7 +1663,7 @@ int i;
 
 void op_xor(void)
 {
-uint8_t pair,src,dest,reg,disp;
+uint8_t reg,disp;
 int16_t addr;
 int i;
 
@@ -1907,9 +1672,7 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            pair = app_memory[app_pc++];
-            src = pair & 0x0f;
-            dest = (pair & 0xf0)>>4;
+            getPair();
 
             for (i=0;i<app_size;i++)
             {
@@ -1920,6 +1683,30 @@ int i;
         case 0x30:
             switch (adr_mode)
             {
+                case 0x35: //R,(PC+DISP)[R]
+                    getPair();
+
+                    // address of 1st byte following instruction is the reference (disp = 0)
+                    addr = 2 + app_pc + getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] ^= app_memory[addr++];
+                    }
+                    break;
+
+                case 0x36: //R,(ADDR)[R]
+                    getPair();
+                    addr = getword(app_pc) + get_addr(src)*app_size;
+                    app_pc +=2;
+
+                    for (i=0;i<app_size;i++)
+                    {
+                        app_reg[dest][i] ^= app_memory[addr++];
+                    }
+                    break;
+
                 case 0x37: //ADDR,#
                     // Read addr
                     addr = getword(app_pc);
@@ -1933,10 +1720,7 @@ int i;
                     break;
 
                 case 0x38: //r,*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1946,10 +1730,7 @@ int i;
                     break;
 
                 case 0x39: //r,*p++
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src);
 
                     for (i=0;i<app_size;i++)
@@ -1961,10 +1742,7 @@ int i;
                     break;
 
                 case 0x3A: //r,--*p
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(src) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1975,11 +1753,8 @@ int i;
                     break;
 
                 case 0x3B: //r,p[d] d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
                     addr = get_addr(src) + disp * app_size;
 
                     for (i=0;i<app_size;i++)
@@ -1989,10 +1764,7 @@ int i;
                     break;
 
                 case 0x3C: //*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -2002,10 +1774,7 @@ int i;
                     break;
 
                 case 0x3D: //*p++,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
@@ -2016,10 +1785,7 @@ int i;
                     break;
 
                 case 0x3E: //--*p,r
-                    pair = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
-
+                    getPair();
                     addr = get_addr(dest) - app_size;
 
                     for (i=0;i<app_size;i++)
@@ -2031,10 +1797,8 @@ int i;
                     break;
 
                 case 0x3F: //p[d],r d: index 0-n
-                    pair = app_memory[app_pc++];
+                    getPair();
                     disp = app_memory[app_pc++];
-                    src = pair & 0x0f;
-                    dest = (pair & 0xf0)>>4;
 
                     addr = get_addr(dest) + disp * app_size;
 
@@ -2049,30 +1813,6 @@ int i;
             }
             break;
 
-#if 0
-        //r': adr pointer, d: 8-bit displacement
-        case 0xB0: //r,(r')
-            addr = get_addr(src);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_reg[reg][i] ^= app_memory[addr++];
-            }
-            break;
-        case 0xC0: //r,(r'+d)
-            break;
-        case 0xD0: //(r'),r
-            addr = get_addr(dest);
-
-            for (i=0;i<app_size;i++)
-            {
-                app_memory[addr++] ^= app_reg[reg][i];
-            }
-            break;
-            break;
-        case 0xE0: //(r'+d),r
-            break;
-#endif
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
@@ -2120,10 +1860,10 @@ uint8_t port;
 int result, val;
 
     port = app_memory[app_pc++];
-    if (step_mode) printw("IN: [%02X] = ",port);
+    if (step_mode) wprintw(wConsole,"IN: [%02X] = ",port);
 
     result = scanw("%02X",&val);
-    if (step_mode) printw("Result: %02X, Input: %02X\n",result,val & 0xff);
+    if (step_mode) wprintw(wConsole,"Result: %02X, Input: %02X\n",result,val & 0xff);
 
     if ((adr_mode & 0xf0) == 0xF0)
     {
@@ -2150,7 +1890,7 @@ uint8_t port,val;
     }
     if (step_mode)
     {
-        printw("OUT: [%02X] = %02X\n",port,val);
+        wprintw(wConsole,"OUT: [%02X] = %02X\n",port,val);
     }
     else
     {
@@ -2182,7 +1922,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printw("ASX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) wprintw(wConsole,"ASX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {
@@ -2233,7 +1973,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printw("ROX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) wprintw(wConsole,"ROX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {
@@ -2278,7 +2018,7 @@ int temp, temp_cy;
     nb_shifts = (param & 0x70) >> 4;
     reg = param & 0x0f;
 
-    if (step_mode) printw("LSX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
+    if (step_mode) wprintw(wConsole,"LSX Side: %d, Shifts: %d, Reg: %d\n",side,nb_shifts,reg);
 
     if (side == 0)
     {

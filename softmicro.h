@@ -14,6 +14,8 @@
 #define SOFT_MICRO_INST_SET_VERSION 2
 #define VECTOR_TABLE_BEGIN 0xFFE0
 
+extern WINDOW *wMain, *wRegs, *wMem, *wStack, *wPC, *wConsole;
+
 void OpStep(void);
 void OpStep2(void);
 void OpStep3(void);
