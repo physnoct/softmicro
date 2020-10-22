@@ -98,7 +98,7 @@ int i,j;
 
     for (i=0;i<16;i++)
     {
-        wprintw(w,"%04X: ",addr & 0xFF00 + i*16);
+        wprintw(w,"%04X: ",(addr & 0xFF00) + i*16);
 
         for (j=0;j<16;j++)
         {
