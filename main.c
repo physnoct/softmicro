@@ -213,26 +213,22 @@ bool quit = false;
 
     (void) signal(SIGINT, finish);      /* arrange interrupts to terminate */
 
-    slk_init(3);    /* Soft key setup */
     initscr();      /* initialize the curses library */
 
-//    keypad(stdscr, TRUE);  /* enable keyboard mapping */
     (void) nonl();         /* tell curses not to do NL->CR/NL on output */
     (void) cbreak();       /* take input chars one at a time, no wait for \n */
     (void) echo();         /* echo input - in color */
 
-    //sMem = newterm(NULL,stdin,stdout);
-    //wprintw(wConsole,"Screen memory\n");
     if (has_colors())
     {
         start_color();
 
-        /*
-         * Simple color assignment, often all we need.  Color pair 0 cannot
+/*
+     * Simple color assignment, often all we need.  Color pair 0 cannot
 	 * be redefined.  This example uses the same value for the color
 	 * pair as for the foreground color, though of course that is not
 	 * necessary:
-         */
+*/
 /*
         init_pair(1, COLOR_RED,     COLOR_BLACK);
         init_pair(2, COLOR_GREEN,   COLOR_BLACK);
@@ -296,35 +292,26 @@ bool quit = false;
 
     wConsole = subwin(wBConsole,31,130,35,1);
     scrollok(wConsole,TRUE);
-    refresh();
 
     wattrset(wConsole,COLOR_PAIR(7));
-	//wprintw(wConsole,"Soft micro C v1.0, Inst set: %d\n\n",SOFT_MICRO_INST_SET_VERSION);
     wrefresh(wConsole);
 
-
     ClrRegisters();
-    refresh();
-
-    //c = getch();
 
     do
     {
-        //wclear(wConsole);
         wmove(wConsole,0,0);
 
-//        attrset(COLOR_PAIR(5));
         DisplayPC(wPC);
         DisplayStack(wStack);
         DisplayRegisters(wRegs);
         DisplayMemory(wMem,Current_address);
 
-//        attrset(COLOR_PAIR(7));
         wprintw(wConsole,"Soft micro C v1.0, Inst set: %d\n\n"
-                "\tA\tReset\n"
-                "\tB\tStep into\n"
-                "\tC\tRun to next return\n"
-                "\tD\tRun\n"
+                "\tA\tReset\t\t\t+\tADDR + 0100\n"
+                "\tB\tStep into\t\t-\tADDR - 0100\n"
+                "\tC\tRun to next return\t*\tADDR + 1000\n"
+                "\tD\tRun\t\t\t/\tADDR - 1000\n"
                 "\tE\tErase memory\n"
                 "\tF\tLoad binary file\n"
                 "\tL\tLoad memory\n"
@@ -368,6 +355,20 @@ bool quit = false;
             case 'Q':
                 quit = true;
                 break;
+
+            case '+':
+                Current_address += 0x0100;
+                break;
+            case '-':
+                Current_address -= 0x0100;
+                break;
+            case '*':
+                Current_address += 0x1000;
+                break;
+            case '/':
+                Current_address -= 0x1000;
+                break;
+
             default:
             ;
         }
@@ -375,7 +376,6 @@ bool quit = false;
         wrefresh(wConsole);
 
     } while (!quit);
-
 
     finish(0);
 }
