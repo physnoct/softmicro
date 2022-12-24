@@ -4,7 +4,7 @@
 
 #subruledef ;asm_ver
 {
-    assembler_version => 2
+    assembler_version => 0x02
 }
 
 #subruledef reg_table
@@ -99,7 +99,7 @@
 {
     vasm =>
     {
-        0x30 @ 0x20 @ assembler_version`8
+        0x30 @ 0x20 @ 0x02  ;assembler_version`8
     }
 
     nop         => 0x00
@@ -187,19 +187,19 @@
 
     {op: ops_table} {dest: reg_table},*{src: reg_table}   => {pair = (dest << 4)|src, 0x38 @ op`8 @ pair`8}
     {op: ops_table} {dest: reg_table},*{src: reg_table}++ => {pair = (dest << 4)|src, 0x39 @ op`8 @ pair`8}
-    {op: ops_table} {dest: reg_table},--*{src: reg_table} => {pair = (dest << 4)|src, 0x3a @ op`8 @ pair`8}
+    {op: ops_table} {dest: reg_table},*--{src: reg_table} => {pair = (dest << 4)|src, 0x3a @ op`8 @ pair`8}
     {op: ops_table} *{dest: reg_table},{src: reg_table}   => {pair = (dest << 4)|src, 0x3c @ op`8 @ pair`8}
     {op: ops_table} *{dest: reg_table}++,{src: reg_table} => {pair = (dest << 4)|src, 0x3d @ op`8 @ pair`8}
-    {op: ops_table} --*{dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, 0x3e @ op`8 @ pair`8}
+    {op: ops_table} *--{dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, 0x3e @ op`8 @ pair`8}
     {op: ops_table} {dest: reg_table},{src: reg_table}[{disp}] => {pair = (dest << 4)|src, 0x3b @ op`8 @ pair`8 @ disp`8}
     {op: ops_table} {dest: reg_table}[{disp}],{src: reg_table} => {pair = (dest << 4)|src, 0x3f @ op`8 @ pair`8 @ disp`8}
 
     {op: ops_table}.{size: size_table} {dest: reg_table},*{src: reg_table}   => {pair = (dest << 4)|src, size`8 @ 0x38 @ op`8 @ pair`8}
     {op: ops_table}.{size: size_table} {dest: reg_table},*{src: reg_table}++ => {pair = (dest << 4)|src, size`8 @ 0x39 @ op`8 @ pair`8}
-    {op: ops_table}.{size: size_table} {dest: reg_table},--*{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3a @ op`8 @ pair`8}
+    {op: ops_table}.{size: size_table} {dest: reg_table},*--{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3a @ op`8 @ pair`8}
     {op: ops_table}.{size: size_table} *{dest: reg_table},{src: reg_table}   => {pair = (dest << 4)|src, size`8 @ 0x3c @ op`8 @ pair`8}
     {op: ops_table}.{size: size_table} *{dest: reg_table}++,{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3d @ op`8 @ pair`8}
-    {op: ops_table}.{size: size_table} --*{dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3e @ op`8 @ pair`8}
+    {op: ops_table}.{size: size_table} *--{dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3e @ op`8 @ pair`8}
     {op: ops_table}.{size: size_table} {dest: reg_table},{src: reg_table}[{disp}] => {pair = (dest << 4)|src, size`8 @ 0x3b @ op`8 @ pair`8 @ disp`8}
     {op: ops_table}.{size: size_table} {dest: reg_table}[{disp}],{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3f @ op`8 @ pair`8 @ disp`8}
     ;--------------------------
@@ -225,18 +225,20 @@
     }
 
     ;REL
-    {op: ops_table}  {dest: reg_table},(pc+{disp})[{src: reg_table}] =>
+    {op: ops_table}  {dest: reg_table},(~{addr})[{src: reg_table}] =>
     {
         assert(op != 0x19),
-        assert(disp <= 0xffff),
+        assert(addr <= 0xffff),
+        disp = addr - pc,
         pair = (dest << 4)|src,
         0x35 @ op`8 @ pair`8 @ le(disp`16)
     }
 
-    {op: ops_table}.{size: size_table} {dest: reg_table},(pc+{disp})[{src: reg_table}] =>
+    {op: ops_table}.{size: size_table} {dest: reg_table},(~{addr})[{src: reg_table}] =>
     {
         assert(op != 0x19),
-        assert(disp <= 0xffff),
+        assert(addr <= 0xffff),
+        disp = addr - pc,
         pair = (dest << 4)|src,
         size`8 @ 0x35 @ op`8 @ pair`8 @ le(disp`16)
     }
@@ -294,29 +296,29 @@
     {
         assert(op != 0x19),
         assert(value <= 0xffff),
-        0x37 @ op`8 @ le(addr`16) @ le(value`16)
+        0x0c @ 0x37 @ op`8 @ le(addr`16) @ le(value`16)
     }
 
     {op: ops_table}.d ({addr}),#{value} =>
     {
         assert(op != 0x19),
         assert(value <= 0xffffffff),
-        0x37 @ op`8 @ le(addr`16) @ le(value`32)
-}
+        0x0d @ 0x37 @ op`8 @ le(addr`16) @ le(value`32)
+    }
 
     {op: ops_table}.q ({addr}),#{value} =>
     {
         assert(op != 0x19),
         assert(value <= 0xffffffffffffffff),
-        0x37 @ op`8 @ le(addr`16) @ le(value`64)
-  }
+        0x0e @ 0x37 @ op`8 @ le(addr`16) @ le(value`64)
+    }
 
     {op: ops_table}.o ({addr}),#{value} =>
     {
         assert(op != 0x19),
         assert(value <= 0xffffffffffffffffffffffffffffffff),
-        0x37 @ op`8 @ le(addr`16) @ le(value`128)
-  }
+        0x0f @ 0x37 @ op`8 @ le(addr`16) @ le(value`128)
+    }
 
     ;--------------------------
     ; BYTE UNARY OPS
@@ -391,8 +393,11 @@
     ;--------------------------
     bitc  {dest: reg_table}.{bit} => {assert(bit<8),param = (bit`3 << 4) | dest`4, 0x1a @ param`8}
     bits  {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit`3 << 4) | dest`4, 0x1a @ param`8}
-    tog   {dest: reg_table}.{bit} => {assert(bit<8),param = (bit << 4) | dest`4, 0x1b @ param`8}
-    test {dest: reg_table}.{bit}  => {assert(bit<8),param = (bit << 4) | dest`4, 0x1c @ param`8}
+    tog   {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit << 4) | dest`4, 0x1b @ param`8}
+    test {dest: reg_table}.{bit}  => {assert(bit<8),param = (bit << 4) | dest`4, 0x1b @ param`8}
+
+;Instruction 1C free
+
     waitc {dest: reg_table}.{bit} => {assert(bit<8),param = (bit << 4) | dest`4, 0x1d @ param`8}
     waits {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit << 4) | dest`4, 0x1d @ param`8}
 
