@@ -9,6 +9,95 @@ void getPair(void)
     dest = (reg_pair & 0xf0)>>4;
 }
 
+/* Used for branch instructions. When size > 2, illegal instruction */
+int16_t get_disp(void)
+{
+int16_t disp16;
+
+    switch (app_size)
+    {
+        case 2:
+            disp16 = getword(app_pc);
+            break;
+        case 1:
+            disp16 = app_memory[app_pc];
+            if (disp16 & 0x80) disp16 |= 0xFF00;
+            break;
+        default:
+            illegal_inst();
+    }
+    if (step_mode) wprintw(wConsole,"get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
+    return disp16;
+}
+
+int16_t getword(uint16_t addr)
+{
+int16_t word;
+
+    word = app_memory[addr+1]*256 + app_memory[addr];
+    return word;
+}
+
+void put_retaddr(int16_t value)
+{
+int16_t sp;
+
+    sp = getsp();
+    app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
+    app_memory[(sp-2)&0xffff] = value & 0xff;
+    setsp(sp-2);
+    if (step_mode) wprintw(wConsole,"PUT RET ADDR: value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
+}
+
+int16_t get_retaddr(void)
+{
+int16_t sp;
+
+    sp = getsp();
+    setsp(sp+2);
+
+    if (step_mode) wprintw(wConsole,"RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
+    return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
+}
+
+void push_byte(uint8_t my_byte)
+{
+uint16_t sp;
+
+    sp = (getsp() - 1) & 0xffff;
+
+    if (step_mode) wprintw(wConsole,"push_byte:\tSP: %04X\n",sp);
+    app_memory[sp] = my_byte;
+    setsp(sp);
+}
+
+uint8_t pop_byte(void)
+{
+uint16_t sp;
+uint8_t my_byte;
+
+    sp = getsp();
+    my_byte = app_memory[sp];
+    setsp(sp+1);
+
+    return my_byte;
+}
+
+void push_imm(void)
+{
+int i;
+
+    for (i=0;i<app_size;i++)
+    {
+        push_byte(app_memory[(app_pc++) & 0xffff]);
+    }
+}
+
+void popn(void)
+{
+    setsp(getsp() + app_memory[(app_pc++) & 0xffff]);
+}
+
 void illegal_inst(void)
 {
 int i;
@@ -23,6 +112,113 @@ int i;
     wprintw(wConsole,"\n");
 }
 
+void mcpdr(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    do
+    {
+        app_memory[adr_dest--] = app_memory[adr_src--];
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
+}
+
+void mcpir(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    wprintw(wConsole,"MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+
+    do
+    {
+        app_memory[adr_dest++] = app_memory[adr_src++];
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
+}
+
+void mfill(void)
+{
+uint8_t value;
+uint16_t begin,end,i;
+
+    getPair();
+    end = get_addr(src);
+    begin = get_addr(dest);
+    value = app_memory[(app_pc++) & 0xffff];
+
+    for (i = begin; i <= end; i++)
+    {
+        app_memory[i] = value;
+    }
+}
+
+void mswap(uint8_t param)
+{
+int i = get_addr(param);
+uint16_t adr_src,adr_dest;
+uint8_t temp;
+
+    getPair();
+    adr_src = get_addr(src);
+    adr_dest = get_addr(dest);
+
+    wprintw(wConsole,"MSWAP: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+
+    do
+    {
+        temp = app_memory[adr_dest];
+        app_memory[adr_dest++] = app_memory[adr_src];
+        app_memory[adr_src++] = temp;
+    } while (--i);
+
+    // Update registers
+    set_addr(param,i);
+    set_addr(src,adr_src);
+    set_addr(dest,adr_dest);
+}
+
+/* Wait until port bit n = 0
+Once instruction is read, execute a port read until condition is met */
+void wait_port(uint8_t param)
+{
+uint8_t bit,value,mask,port;
+int input;
+int result;
+
+    bit = param & 0x07;
+    mask = (1 << bit);
+    value = ((param & 0x08) >> 3) << bit;
+    port = app_memory[app_pc++];
+
+    do
+    {
+        wprintw(wConsole,"WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
+        result = scanw("%02X",&input);
+        wprintw(wConsole,"Result: %02X, Input: %02X\n",result,input & 0xff);
+        wprintw(wConsole,"Mask: %02X, Value: %02X\n",mask,value);
+        if ((input & mask) == value) wprintw(wConsole,"Bit match\n");
+    } while ((input & mask) != value);
+}
+
+/*********************************************************************/
 bool bool_xor(bool a, bool b)
 {
     return (a && !b)||(!a && b);
@@ -209,35 +405,6 @@ void set_addr(uint8_t reg, int16_t addr)
     app_reg[reg][0] = addr & 0xff;
 }
 
-/* Used for branch instructions. When size > 2, illegal instruction */
-int16_t get_disp(void)
-{
-int16_t disp16;
-
-    switch (app_size)
-    {
-        case 2:
-            disp16 = getword(app_pc);
-            break;
-        case 1:
-            disp16 = app_memory[app_pc];
-            if (disp16 & 0x80) disp16 |= 0xFF00;
-            break;
-        default:
-            illegal_inst();
-    }
-    if (step_mode) wprintw(wConsole,"get_disp: Size: %d, app_pc: %04X, disp = %04X\n",app_size,app_pc & 0xffff,disp16 & 0xFFFF);
-    return disp16;
-}
-
-int16_t getword(uint16_t addr)
-{
-int16_t word;
-
-    word = app_memory[addr+1]*256 + app_memory[addr];
-    return word;
-}
-
 int16_t getsp(void)
 {
     return app_reg[15][1]*256 + app_reg[15][0];
@@ -247,51 +414,6 @@ void setsp(int16_t value)
 {
     app_reg[15][1] = (value >> 8) & 0xff;
     app_reg[15][0] = value & 0xff;
-}
-
-void put_retaddr(int16_t value)
-{
-int16_t sp;
-
-    sp = getsp();
-    app_memory[(sp-1)&0xffff] = (value >> 8) & 0xff;
-    app_memory[(sp-2)&0xffff] = value & 0xff;
-    setsp(sp-2);
-    if (step_mode) wprintw(wConsole,"PUT RET ADDR: value: %04X, sp: %04X, H: %02X, L: %02X\n",value,sp & 0xffff,app_memory[sp-1],app_memory[sp-2]);
-}
-
-int16_t get_retaddr(void)
-{
-int16_t sp;
-
-    sp = getsp();
-    setsp(sp+2);
-
-    if (step_mode) wprintw(wConsole,"RET: SP: %04X, H: %02X, L: %02X\n",sp & 0xffff,app_memory[(sp+1) & 0xffff],app_memory[sp & 0xffff]);
-    return app_memory[(sp+1) & 0xffff]*256 + app_memory[sp & 0xffff];
-}
-
-void push_byte(uint8_t my_byte)
-{
-uint16_t sp;
-
-    sp = (getsp() - 1) & 0xffff;
-
-    if (step_mode) wprintw(wConsole,"push_byte:\tSP: %04X\n",sp);
-    app_memory[sp] = my_byte;
-    setsp(sp);
-}
-
-uint8_t pop_byte(void)
-{
-uint16_t sp;
-uint8_t my_byte;
-
-    sp = getsp();
-    my_byte = app_memory[sp];
-    setsp(sp+1);
-
-    return my_byte;
 }
 
 void branch(uint8_t param)
@@ -381,96 +503,6 @@ uint8_t test_bit,test_mask,test;
     {
         app_pc += app_size;
     }
-}
-
-void mcpdr(uint8_t param)
-{
-int i = get_addr(param);
-uint16_t adr_src,adr_dest;
-
-    getPair();
-    adr_src = get_addr(src);
-    adr_dest = get_addr(dest);
-
-    do
-    {
-        app_memory[adr_dest--] = app_memory[adr_src--];
-    } while (--i);
-
-    // Update registers
-    set_addr(param,i);
-    set_addr(src,adr_src);
-    set_addr(dest,adr_dest);
-}
-
-void mcpir(uint8_t param)
-{
-int i = get_addr(param);
-uint16_t adr_src,adr_dest;
-
-    getPair();
-    adr_src = get_addr(src);
-    adr_dest = get_addr(dest);
-
-    wprintw(wConsole,"MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
-
-    do
-    {
-        app_memory[adr_dest++] = app_memory[adr_src++];
-    } while (--i);
-
-    // Update registers
-    set_addr(param,i);
-    set_addr(src,adr_src);
-    set_addr(dest,adr_dest);
-}
-
-void mswap(uint8_t param)
-{
-int i = get_addr(param);
-uint16_t adr_src,adr_dest;
-uint8_t temp;
-
-    getPair();
-    adr_src = get_addr(src);
-    adr_dest = get_addr(dest);
-
-    wprintw(wConsole,"MSWAP: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
-
-    do
-    {
-        temp = app_memory[adr_dest];
-        app_memory[adr_dest++] = app_memory[adr_src];
-        app_memory[adr_src++] = temp;
-    } while (--i);
-
-    // Update registers
-    set_addr(param,i);
-    set_addr(src,adr_src);
-    set_addr(dest,adr_dest);
-}
-
-/* Wait until port bit n = 0
-Once instruction is read, execute a port read until condition is met */
-void wait_port(uint8_t param)
-{
-uint8_t bit,value,mask,port;
-int input;
-int result;
-
-    bit = param & 0x07;
-    mask = (1 << bit);
-    value = ((param & 0x08) >> 3) << bit;
-    port = app_memory[app_pc++];
-
-    do
-    {
-        wprintw(wConsole,"WAIT PORT,BIT,VALUE: [%02X.%d] = %d\n",port,bit,(param & 0x08) >> 3);
-        result = scanw("%02X",&input);
-        wprintw(wConsole,"Result: %02X, Input: %02X\n",result,input & 0xff);
-        wprintw(wConsole,"Mask: %02X, Value: %02X\n",mask,value);
-        if ((input & mask) == value) wprintw(wConsole,"Bit match\n");
-    } while ((input & mask) != value);
 }
 
 void app_vector(uint8_t param)
@@ -683,8 +715,8 @@ bool val;
 }
 
 /* Size = 1 only */
-/* bit 7 of following byte is unused */
-void toggle_bit(void)
+/* bit 7: 1: toggle, 0: test */
+void test_toggle_bit(void)
 {
 uint8_t pair,bit,reg, mask;
 
@@ -696,29 +728,18 @@ uint8_t pair,bit,reg, mask;
     switch(adr_mode & 0xF0)
     {
         case 0:
-            app_reg[reg][0] ^= mask;
-            app_pc++;
-            break;
-        default:
-            illegal_inst();
-    }
-}
-
-/* Size = 1 only */
-/* Set Z flag if bit = 0*/
-void test_bit(void)
-{
-uint8_t pair,bit,reg;
-
-    pair = app_memory[app_pc];
-    reg = pair & 0x0f;
-    bit = (pair & 0x70) >> 4;
-
-    switch(adr_mode & 0xF0)
-    {
-        case 0:
-            test_bit_reg(app_reg[reg][0],bit);
-            app_pc++;
+		    if (pair & 0x80)
+		    {
+		    	//Toggle
+                app_reg[reg][0] ^= mask;
+                app_pc++;
+		    }
+		    else
+		    {
+		    	//Test
+                test_bit_reg(app_reg[reg][0],bit);
+                app_pc++;
+		    }
             break;
         default:
             illegal_inst();
@@ -760,33 +781,4 @@ int i;
     }
 }
 
-void push_imm(void)
-{
-int i;
 
-    for (i=0;i<app_size;i++)
-    {
-        push_byte(app_memory[(app_pc++) & 0xffff]);
-    }
-}
-
-void popn(void)
-{
-    setsp(getsp() + app_memory[(app_pc++) & 0xffff]);
-}
-
-void mfill(void)
-{
-uint8_t value;
-uint16_t begin,end,i;
-
-    getPair();
-    begin = get_addr(src);
-    end = get_addr(dest);
-    value = app_memory[(app_pc++) & 0xffff];
-
-    for (i = begin; i <= end; i++)
-    {
-        app_memory[i] = value;
-    }
-}

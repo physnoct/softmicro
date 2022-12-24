@@ -66,8 +66,7 @@ uint8_t get_bit_val(uint8_t bit, uint8_t reg);
 void test_bit_reg(uint8_t bit, uint8_t reg);
 
 void set_bit(void);
-void toggle_bit(void);
-void test_bit(void);
+void test_toggle_bit(void);
 void wait_bit(void);
 void op_rand(void);
 void push_imm(void);

@@ -5,6 +5,7 @@ uint8_t app_reg[16][16];
 uint8_t app_flags;
 int16_t app_pc;
 uint8_t app_size,adr_mode;
+uint8_t size_byte;
 bool step_mode = true;
 bool run_until_ret = false;
 
@@ -15,6 +16,7 @@ int16_t temp;
 
     app_size = 1;
     adr_mode = 0;
+    size_byte = 0;
 
     op_code = app_memory[app_pc++];
 
@@ -117,21 +119,25 @@ int16_t temp;
             /* Size prefix */
             case 0x0c: //.W
                 app_size = 2;
+                size_byte = 1;
                 if (step_mode) wprintw(wConsole,".W\n");
                 OpStep2();
                 break;
             case 0x0d: //.D
                 app_size = 4;
+                size_byte = 1;
                 if (step_mode) wprintw(wConsole,".D\n");
                 OpStep2();
                 break;
             case 0x0e: //.Q
                 app_size = 8;
+                size_byte = 1;
                 if (step_mode) wprintw(wConsole,".Q\n");
                 OpStep2();
                 break;
             case 0x0f: //.O
                 app_size = 16;
+                size_byte = 1;
                 if (step_mode) wprintw(wConsole,".O\n");
                 OpStep2();
                 break;
@@ -170,10 +176,10 @@ int16_t temp;
                 set_bit();
                 break;
             case 0x1b: // BIT toggle
-                toggle_bit();
+                test_toggle_bit();
                 break;
             case 0x1c: // BIT test
-                test_bit();
+                //unassigned
                 break;
             case 0x1d: // BIT wait
                 wait_bit();

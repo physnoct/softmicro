@@ -5,11 +5,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <ncurses.h>
 
 #include "routines.h"
 #include "ops.h"
+#include "decode.h"
 
 #define SOFT_MICRO_INST_SET_VERSION 2
 #define VECTOR_TABLE_BEGIN 0xFFE0
@@ -25,7 +27,7 @@ extern uint8_t app_memory[65536];
 extern uint8_t app_reg[16][16];
 extern uint8_t app_flags;
 extern int16_t app_pc;
-extern uint8_t app_size,adr_mode;
+extern uint8_t app_size,adr_mode,size_byte;
 extern bool step_mode;
 extern bool run_until_ret;
 

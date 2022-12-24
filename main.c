@@ -51,16 +51,15 @@ uint16_t sp;
 
 void DisplayPC(WINDOW *w)
 {
-int i;
     wbkgd(w,COLOR_PAIR(5));
     wclear(w);
 
+ 	/* Decode the next instruction to be executed. */
+	OpDecode(app_pc);
+
     wprintw(w,"Size: %d, Address mode: %02X\n",app_size,adr_mode);
-    wprintw(w,"PC: %04X:",app_pc & 0xFFFF);
-    for (i=0;i<16;i++)
-    {
-        wprintw(w," %02X",app_memory[app_pc+i]);
-    }
+	wprintw(w,"\nPC: %04X %s\n\t%s", app_pc, dump_buffer, decode_buffer);
+
     wrefresh(w);
 }
 
@@ -248,49 +247,49 @@ bool quit = false;
     }
     refresh();
 
-    /* PC */
-    wBPC = newwin(4,60,0,0);
-    box(wBPC,0,0);
-    mvwaddstr(wBPC,0,2,"PC");
-    wrefresh(wBPC);
-
-    wPC = subwin(wBPC,2,58,1,1);
-    DisplayPC(wPC);
-
-    /* Stack */
-    wBStack = newwin(30,19,4,0);
-    box(wBStack,0,0);
-    mvwaddstr(wBStack,0,2,"Stack");
-    wrefresh(wBStack);
-
-    wStack = subwin(wBStack,28,17,5,1);
-    DisplayStack(wStack);
-
-    /* Regs */
-    wBRegs = newwin(21,40,4,20);
-    box(wBRegs,0,0);
-    mvwaddstr(wBRegs,0,2,"Regs");
-    wrefresh(wBRegs);
-
-    wRegs = subwin(wBRegs,19,38,5,21);
-    DisplayRegisters(wRegs);
-
     /* Memory */
-    wBMem = newwin(18,56,0,60);
+    wBMem = newwin(18,56,0,0);
     box(wBMem,0,0);
     mvwaddstr(wBMem,0,2,"Memory");
     wrefresh(wBMem);
 
-    wMem = subwin(wBMem,16,54,1,61);
+    wMem = subwin(wBMem,16,54,1,1);
     DisplayMemory(wMem,0);
 
+    /* Regs */
+    wBRegs = newwin(21,40,0,57);
+    box(wBRegs,0,0);
+    mvwaddstr(wBRegs,0,2,"Regs");
+    wrefresh(wBRegs);
+
+    wRegs = subwin(wBRegs,19,38,1,58);
+    DisplayRegisters(wRegs);
+
+    /* Stack */
+    wBStack = newwin(30,19,0,98);
+    box(wBStack,0,0);
+    mvwaddstr(wBStack,0,2,"Stack");
+    wrefresh(wBStack);
+
+    wStack = subwin(wBStack,28,17,1,99);
+    DisplayStack(wStack);
+
+    /* PC */
+    wBPC = newwin(8,82,22,0);
+    box(wBPC,0,0);
+    mvwaddstr(wBPC,0,2,"PC");
+    wrefresh(wBPC);
+
+    wPC = subwin(wBPC,6,80,23,1);
+    DisplayPC(wPC);
+
     /* Console */
-    wBConsole = newwin(33,132,34,0);
+    wBConsole = newwin(23,132,31,0);
     box(wBConsole,0,0);
     mvwaddstr(wBConsole,0,2,"Console");
     wrefresh(wBConsole);
 
-    wConsole = subwin(wBConsole,31,130,35,1);
+    wConsole = subwin(wBConsole,21,130,32,1);
     scrollok(wConsole,TRUE);
 
     wattrset(wConsole,COLOR_PAIR(7));
@@ -307,7 +306,7 @@ bool quit = false;
         DisplayRegisters(wRegs);
         DisplayMemory(wMem,Current_address);
 
-        wprintw(wConsole,"Soft micro C v1.0, Inst set: %d\n\n"
+        wprintw(wConsole,"Soft micro C v1.1, Inst set: %d\n\n"
                 "\tA\tReset\t\t\t+\tADDR + 0100\n"
                 "\tB\tStep into\t\t-\tADDR - 0100\n"
                 "\tC\tRun to next return\t*\tADDR + 1000\n"
