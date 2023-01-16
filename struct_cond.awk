@@ -115,6 +115,12 @@ function M_DO_WHILE_CMP(REGISTER,CONDITION,VALUE)
 	DO_WHILE_END()
 }
 
+function M_DO_WDEC_WHILE_NZ(REGISTER)
+{
+    WDEC_JUMP_NZ(REGISTER,"DO_",_sp_do_ctr,_sp_do_lbl[_sp_do_ctr])
+	DO_WHILE_END()
+}
+
 function M_DO_DEC_WHILE_NZ(REGISTER)
 {
     DEC_JUMP_NZ(REGISTER,"DO_",_sp_do_ctr,_sp_do_lbl[_sp_do_ctr])

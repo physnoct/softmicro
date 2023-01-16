@@ -400,3 +400,7 @@ function DEC_JUMP_NZ(REGISTER,TYPE,CTR1,CTR2)
     printf("\tdjnz\t%s,%s%02d%03d\n",REGISTER,TYPE,CTR1,CTR2)
 }
 
+function WDEC_JUMP_NZ(REGISTER,TYPE,CTR1,CTR2)
+{
+    printf("\tdjnz.w\t%s,%s%02d%03d\n",REGISTER,TYPE,CTR1,CTR2)
+}

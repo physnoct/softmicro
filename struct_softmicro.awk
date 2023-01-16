@@ -68,6 +68,7 @@ BEGIN {
 	    else if ($1 ~ /_do_while_equ/) {M_DO_WHILE_EQU($2,$3)}
 	    else if ($1 ~ /_do_while_neq/) {M_DO_WHILE_NOT_EQU($2,$3)}
 	    else if ($1 ~ /_do_while_cmp/) {M_DO_WHILE_CMP($2,$3,$4)}
+	    else if ($1 ~ /_do_while_wdnz/) {M_DO_WDEC_WHILE_NZ($2)}
 	    else if ($1 ~ /_do_while_dnz/) {M_DO_DEC_WHILE_NZ($2)}
 	    else if ($1 ~ /_do_while_range/) {M_DO_WHILE_RANGE($2,$3,$4)}
 	    else if ($1 ~ /_do_while_always/) {M_DO_WHILE_ALWAYS()}
