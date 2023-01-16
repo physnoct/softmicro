@@ -6,15 +6,27 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <ncurses.h>
 
-#include "routines.h"
-#include "ops.h"
-#include "decode.h"
-
-#define SOFT_MICRO_INST_SET_VERSION 2
+#define SOFT_MICRO_INST_SET_VERSION 3
 #define VECTOR_TABLE_BEGIN 0xFFE0
+#define NMI_VECT 0xFFDE
+
+typedef union {
+    uint8_t B[16];
+    uint16_t W[8];
+    uint32_t D[4];
+    uint64_t Q[2];
+#ifdef __SIZEOF_INT128__
+    __uint128_t O;
+#endif
+} uint128_t;
+
+#include "ops.h"
+#include "routines.h"
+#include "decode.h"
 
 extern WINDOW *wMain, *wRegs, *wMem, *wStack, *wPC, *wConsole;
 
@@ -23,13 +35,15 @@ void OpStep2(void);
 void OpStep3(void);
 void OpExtended(void);
 
+extern uint8_t hvect;
 extern uint8_t app_memory[65536];
-extern uint8_t app_reg[16][16];
+extern uint128_t app_reg[16];
 extern uint8_t app_flags;
-extern int16_t app_pc;
+extern uint16_t app_pc;
 extern uint8_t app_size,adr_mode,size_byte;
 extern bool step_mode;
 extern bool run_until_ret;
+extern bool extended;
 
 #define FLAG_S_MASK 0x80
 #define FLAG_T_MASK 0x40

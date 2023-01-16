@@ -32,9 +32,9 @@ int i;
         case 0xF0:
             for (i=0;i<app_size;i++)
             {
-                temp = reverse_byte(app_reg[reg][(app_size-1)-i]);
-                app_reg[reg][(app_size-1)-i] = reverse_byte(app_reg[reg][i]);
-                app_reg[reg][i] = temp;
+                temp = reverse_byte(app_reg[reg].B[(app_size-1)-i]);
+                app_reg[reg].B[(app_size-1)-i] = reverse_byte(app_reg[reg].B[i]);
+                app_reg[reg].B[i] = temp;
             }
             break;
         default:
@@ -54,7 +54,7 @@ int i;
         case 0xF0:
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = sxt_byte();
+                app_reg[reg].B[i] = sxt_byte();
             }
             break;
         default:
@@ -74,7 +74,7 @@ int i;
         case 0xF0:
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = ~app_reg[reg][i];
+                app_reg[reg].B[i] = ~app_reg[reg].B[i];
             }
             break;
         default:
@@ -94,13 +94,13 @@ int i;
         case 0xF0:
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = ~app_reg[reg][i];
+                app_reg[reg].B[i] = ~app_reg[reg].B[i];
             }
 
             app_flags |= FLAG_C_MASK;
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = byte_adc(app_reg[reg][i],0);
+                app_reg[reg].B[i] = byte_adc(app_reg[reg].B[i],0);
             }
 
             break;
@@ -131,6 +131,31 @@ int16_t adrModeRelativeTableIndex(void)
     return addr;
 }
 
+void op_st(void)
+{
+uint8_t reg;
+int16_t addr;
+int i;
+
+    reg = adr_mode & 0x0f;
+
+    switch(adr_mode & 0xf0)
+    {
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=0;i<app_size;i++)
+            {
+                app_memory[addr++] = app_reg[reg].B[i];
+            }
+            break;
+
+        default:
+            illegal_inst();
+    }
+}
+
 void op_load(void)
 {
 uint8_t reg,disp;
@@ -142,13 +167,47 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] = app_reg[src][i];
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] = app_reg[src].B[i2];
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] = app_reg[src].W[i2];
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] = app_reg[src].D[i2];
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] = app_reg[src].Q[i2];
+                        break;
+                    default:
+                        illegal_inst();
+                }
+            }
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] = app_reg[src].B[i];
+                }
             }
             break;
+
         case 0x30:
             switch (adr_mode)
             {
@@ -157,7 +216,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = app_memory[addr++];
+                        app_reg[dest].B[i] = app_memory[addr++];
                     }
                     break;
 
@@ -168,7 +227,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = app_memory[addr++];
+                        app_reg[dest].B[i] = app_memory[addr++];
                     }
                     break;
 
@@ -190,7 +249,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = app_memory[addr++];
+                        app_reg[dest].B[i] = app_memory[addr++];
                     }
                     break;
 
@@ -200,7 +259,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = app_memory[addr++];
+                        app_reg[dest].B[i] = app_memory[addr++];
                     }
 
                     set_addr(src,addr);
@@ -216,7 +275,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] = app_memory[addr++];
+                            app_reg[dest].B[i] = app_memory[addr++];
                         }
                         set_addr(src,temp);
                     }
@@ -225,34 +284,31 @@ int i;
                 case 0x3B: //r,p[d] d: index 0-n
                     getPair();
                     disp = app_memory[app_pc++];
-
                     addr = get_addr(src) + disp * app_size;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = app_memory[addr++];
+                        app_reg[dest].B[i] = app_memory[addr++];
                     }
                     break;
 
                 case 0x3C: //*p,r
                     getPair();
-
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] = app_reg[src][i];
+                        app_memory[addr++] = app_reg[src].B[i];
                     }
                     break;
 
                 case 0x3D: //*p++,r
                     getPair();
-
                     addr = get_addr(dest);
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] = app_reg[src][i];
+                        app_memory[addr++] = app_reg[src].B[i];
                     }
                     set_addr(dest,addr);
                     break;
@@ -262,13 +318,12 @@ int i;
                     uint16_t temp;
 
                         getPair();
-
                         temp = get_addr(dest) - app_size;
                         addr = temp;
 
                         for (i=0;i<app_size;i++)
                         {
-                             app_memory[addr++] = app_reg[src][i];
+                             app_memory[addr++] = app_reg[src].B[i];
                         }
 
                         set_addr(dest,temp);
@@ -283,7 +338,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] = app_reg[src][i];
+                        app_memory[addr++] = app_reg[src].B[i];
                     }
                     break;
 
@@ -292,10 +347,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=0;i<app_size;i++)
+            {
+                app_reg[reg].B[i] = app_memory[addr++];
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = app_memory[app_pc++];
+                app_reg[reg].B[i] = app_memory[app_pc++];
             }
             break;
 
@@ -312,28 +377,71 @@ int i;
     for (i=0;i<app_size;i++)
     {
         temp = app_memory[addr];
-        app_memory[addr++] = app_reg[reg][i];
-        app_reg[reg][i] = temp;
+        app_memory[addr++] = app_reg[reg].B[i];
+        app_reg[reg].B[i] = temp;
     }
     return addr;
 }
 
 void op_ex(void)
 {
-uint8_t disp,temp;
+uint8_t reg,disp,temp;
 int16_t addr;
 int i;
+
+    reg = adr_mode & 0x0f;
 
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                temp = app_reg[src][i];
-                app_reg[src][i] = app_reg[dest][i];
-                app_reg[dest][i] = temp;
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        temp = app_reg[src].B[i2];
+                        app_reg[src].B[i2] = app_reg[dest].B[i1];
+                        app_reg[dest].B[i1] = temp;
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        temp = app_reg[src].W[i2];
+                        app_reg[src].W[i2] = app_reg[dest].W[i1];
+                        app_reg[dest].W[i1] = temp;
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        temp = app_reg[src].D[i2];
+                        app_reg[src].D[i2] = app_reg[dest].D[i1];
+                        app_reg[dest].D[i1] = temp;
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        temp = app_reg[src].Q[i2];
+                        app_reg[src].Q[i2] = app_reg[dest].Q[i1];
+                        app_reg[dest].Q[i1] = temp;
+                        break;
+                    default:
+                        illegal_inst();
+                }
+            }
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    temp = app_reg[src].B[i];
+                    app_reg[src].B[i] = app_reg[dest].B[i];
+                    app_reg[dest].B[i] = temp;
+                }
             }
             break;
         case 0x30:
@@ -341,21 +449,18 @@ int i;
             {
                 case 0x38: //r,*p
                     getPair();
-
                     addr = get_addr(src);
                     ex_reg_memory(addr,dest);
                     break;
 
                 case 0x3c: //*p,r
                     getPair();
-
                     addr = get_addr(dest);
                     ex_reg_memory(addr,src);
                     break;
 
                 case 0x39: //r,*p++
                     getPair();
-
                     addr = get_addr(src);
                     addr = ex_reg_memory(addr,dest);
                     set_addr(src,addr);
@@ -363,7 +468,6 @@ int i;
 
                 case 0x3d: //*p++,r
                     getPair();
-
                     addr = get_addr(dest);
                     addr = ex_reg_memory(addr,src);
                     set_addr(dest,addr);
@@ -398,7 +502,6 @@ int i;
                 case 0x3B: //r,p[d] d: index 0-n
                     getPair();
                     disp = app_memory[app_pc++];
-
                     addr = get_addr(src) + disp * app_size;
                     ex_reg_memory(addr,dest);
                     break;
@@ -406,7 +509,6 @@ int i;
                 case 0x3f:
                     getPair();
                     disp = app_memory[app_pc++];
-
                     addr = get_addr(dest) + disp * app_size;
                     ex_reg_memory(addr,src);
                     break;
@@ -414,6 +516,12 @@ int i;
                 default:
                     illegal_inst();
             }
+            break;
+
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+            ex_reg_memory(addr,reg);
             break;
 
         default:
@@ -432,15 +540,48 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            app_reg[dest][0] = byte_add(app_reg[dest][0],app_reg[src][0]);
-
-            for (i=1;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] = byte_adc(app_reg[dest][i],app_reg[src][i]);
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] = byte_add(app_reg[dest].B[i1],app_reg[src].B[i2]);
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] = byte_add(app_reg[dest].W[i1],app_reg[src].W[i2]);
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] = byte_add(app_reg[dest].D[i1],app_reg[src].D[i2]);
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] = byte_add(app_reg[dest].Q[i1],app_reg[src].Q[i2]);
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_reg[src].B[0]);
+
+                for (i=1;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_reg[src].B[i]);
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -448,11 +589,11 @@ int i;
                 case 0x35: //R,(~ADDR)[R]
                     addr = adrModeRelativeTableIndex();
 
-                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -461,11 +602,11 @@ int i;
                     addr = getword(app_pc) + get_addr(src)*app_size;
                     app_pc +=2;
 
-                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -489,11 +630,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -501,11 +642,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
 
                     set_addr(src,addr);
@@ -519,11 +660,11 @@ int i;
                         temp = get_addr(src) - app_size;
                         addr = temp;
 
-                        app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                        app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                         for (i=1;i<app_size;i++)
                         {
-                            app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                            app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                         }
                         set_addr(src,temp);
                     }
@@ -534,11 +675,11 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(src) + disp * app_size;
 
-                    app_reg[dest][0] = byte_add(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_add(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -546,12 +687,12 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -560,12 +701,12 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     set_addr(dest,addr);
@@ -579,12 +720,12 @@ int i;
                         temp = get_addr(dest) - app_size;
                         addr = temp;
 
-                        app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
+                        app_memory[addr] = byte_add(app_memory[addr],app_reg[src].B[0]);
                         addr++;
 
                         for (i=1;i<app_size;i++)
                         {
-                            app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                            app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                             addr++;
                         }
 
@@ -597,12 +738,12 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(dest) + disp * app_size;
 
-                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_add(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -612,12 +753,24 @@ int i;
             }
             break;
 
-        case 0xF0: //r,#
-            app_reg[reg][0] = byte_add(app_reg[reg][0],app_memory[app_pc++]);
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            app_reg[reg].B[0] = byte_add(app_reg[reg].B[0],app_memory[addr++]);
 
             for (i=1;i<app_size;i++)
             {
-                app_reg[reg][i] = byte_adc(app_reg[reg][i],app_memory[app_pc++]);
+                app_reg[reg].B[i] = byte_adc(app_reg[reg].B[i],app_memory[addr++]);
+            }
+            break;
+
+        case 0xF0: //r,#
+            app_reg[reg].B[0] = byte_add(app_reg[reg].B[0],app_memory[app_pc++]);
+
+            for (i=1;i<app_size;i++)
+            {
+                app_reg[reg].B[i] = byte_adc(app_reg[reg].B[i],app_memory[app_pc++]);
             }
             break;
 
@@ -637,13 +790,47 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] = byte_adc(app_reg[dest][i],app_reg[src][i]);
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] = byte_adc(app_reg[dest].B[i1],app_reg[src].B[i2]);
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] = byte_adc(app_reg[dest].W[i1],app_reg[src].W[i2]);
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] = byte_adc(app_reg[dest].D[i1],app_reg[src].D[i2]);
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] = byte_adc(app_reg[dest].Q[i1],app_reg[src].Q[i2]);
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_reg[src].B[i]);
+                }
+
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -653,7 +840,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -664,7 +851,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -687,7 +874,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -697,7 +884,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
 
                     set_addr(src,addr);
@@ -713,7 +900,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                            app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                         }
                         set_addr(src,temp);
                     }
@@ -726,7 +913,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_adc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_adc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -736,7 +923,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -747,7 +934,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     set_addr(dest,addr);
@@ -763,7 +950,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                            app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                             addr++;
                         }
 
@@ -778,7 +965,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_adc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -788,10 +975,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=0;i<app_size;i++)
+            {
+                app_reg[reg].B[i] = byte_adc(app_reg[reg].B[i],app_memory[addr++]);
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = byte_adc(app_reg[reg][i],app_memory[app_pc++]);
+                app_reg[reg].B[i] = byte_adc(app_reg[reg].B[i],app_memory[app_pc++]);
             }
             break;
 
@@ -811,15 +1008,48 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            app_reg[dest][0] = byte_sub(app_reg[dest][0],app_reg[src][0]);
-
-            for (i=1;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_reg[src][i]);
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] = byte_sub(app_reg[dest].B[i1],app_reg[src].B[i2]);
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] = byte_sub(app_reg[dest].W[i1],app_reg[src].W[i2]);
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] = byte_sub(app_reg[dest].D[i1],app_reg[src].D[i2]);
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] = byte_sub(app_reg[dest].Q[i1],app_reg[src].Q[i2]);
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_reg[src].B[0]);
+
+                for (i=1;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_reg[src].B[i]);
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -827,11 +1057,11 @@ int i;
                 case 0x35: //R,(~ADDR)[R]
                     addr = adrModeRelativeTableIndex();
 
-                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -840,11 +1070,11 @@ int i;
                     addr = getword(app_pc) + get_addr(src)*app_size;
                     app_pc +=2;
 
-                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -868,11 +1098,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -880,11 +1110,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
 
                     set_addr(src,addr);
@@ -898,11 +1128,11 @@ int i;
                         temp = get_addr(src) - app_size;
                         addr = temp;
 
-                        app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                        app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                         for (i=1;i<app_size;i++)
                         {
-                            app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                            app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                         }
                         set_addr(src,temp);
                     }
@@ -913,11 +1143,11 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(src) + disp * app_size;
 
-                    app_reg[dest][0] = byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    app_reg[dest].B[0] = byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -925,12 +1155,12 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -939,12 +1169,12 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     set_addr(dest,addr);
@@ -958,12 +1188,12 @@ int i;
                         temp = get_addr(dest) - app_size;
                         addr = temp;
 
-                        app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
+                        app_memory[addr] = byte_sub(app_memory[addr],app_reg[src].B[0]);
                         addr++;
 
                         for (i=1;i<app_size;i++)
                         {
-                            app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                            app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                             addr++;
                         }
 
@@ -976,12 +1206,12 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(dest) + disp * app_size;
 
-                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src][0]);
+                    app_memory[addr] = byte_sub(app_memory[addr],app_reg[src].B[0]);
                     addr++;
 
                     for (i=1;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -991,12 +1221,24 @@ int i;
             }
             break;
 
-        case 0xF0: //r,#
-            app_reg[reg][0] = byte_sub(app_reg[reg][0],app_memory[app_pc++]);
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            app_reg[reg].B[0] = byte_sub(app_reg[reg].B[0],app_memory[addr++]);
 
             for (i=1;i<app_size;i++)
             {
-                app_reg[reg][i] = byte_sbc(app_reg[reg][i],app_memory[app_pc++]);
+                app_reg[reg].B[i] = byte_sbc(app_reg[reg].B[i],app_memory[addr++]);
+            }
+            break;
+
+        case 0xF0: //r,#
+            app_reg[reg].B[0] = byte_sub(app_reg[reg].B[0],app_memory[app_pc++]);
+
+            for (i=1;i<app_size;i++)
+            {
+                app_reg[reg].B[i] = byte_sbc(app_reg[reg].B[i],app_memory[app_pc++]);
             }
             break;
 
@@ -1016,13 +1258,46 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_reg[src][i]);
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] = byte_sbc(app_reg[dest].B[i1],app_reg[src].B[i2]);
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] = byte_sbc(app_reg[dest].W[i1],app_reg[src].W[i2]);
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] = byte_sbc(app_reg[dest].D[i1],app_reg[src].D[i2]);
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] = byte_sbc(app_reg[dest].Q[i1],app_reg[src].Q[i2]);
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_reg[src].B[i]);
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -1032,7 +1307,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1043,7 +1318,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1066,7 +1341,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1076,7 +1351,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
 
                     set_addr(src,addr);
@@ -1092,7 +1367,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                            app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                         }
                         set_addr(src,temp);
                     }
@@ -1105,7 +1380,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] = byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        app_reg[dest].B[i] = byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1115,7 +1390,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -1126,7 +1401,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     set_addr(dest,addr);
@@ -1142,7 +1417,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                            app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                             addr++;
                         }
 
@@ -1157,7 +1432,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src][i]);
+                        app_memory[addr] = byte_sbc(app_memory[addr],app_reg[src].B[i]);
                         addr++;
                     }
                     break;
@@ -1167,10 +1442,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=0;i<app_size;i++)
+            {
+                app_reg[reg].B[i] = byte_sbc(app_reg[reg].B[i],app_memory[addr++]);
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] = byte_sbc(app_reg[reg][i],app_memory[app_pc++]);
+                app_reg[reg].B[i] = byte_sbc(app_reg[reg].B[i],app_memory[app_pc++]);
             }
             break;
 
@@ -1192,13 +1477,46 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            byte_sub(app_reg[dest][0],app_reg[src][0]);
-
-            for (i=1;i<app_size;i++)
+            if (extended)
             {
-                byte_sbc(app_reg[dest][i],app_reg[src][i]);
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        byte_sub(app_reg[dest].B[i1],app_reg[src].B[i2]);
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        byte_sub(app_reg[dest].W[i1],app_reg[src].W[i2]);
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        byte_sub(app_reg[dest].D[i1],app_reg[src].D[i2]);
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        byte_sub(app_reg[dest].Q[i1],app_reg[src].Q[i2]);
+                        break;
+                    default:
+                        illegal_inst();
+                }
+            }
+            else
+            {
+                getPair();
+
+                byte_sub(app_reg[dest].B[0],app_reg[src].B[0]);
+
+                for (i=1;i<app_size;i++)
+                {
+                    byte_sbc(app_reg[dest].B[i],app_reg[src].B[i]);
+                }
             }
             break;
         case 0x30:
@@ -1207,11 +1525,11 @@ int i;
                 case 0x35: //R,(~ADDR)[R]
                     addr = adrModeRelativeTableIndex();
 
-                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1220,11 +1538,11 @@ int i;
                     addr = getword(app_pc) + get_addr(src)*app_size;
                     app_pc +=2;
 
-                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1246,11 +1564,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1258,11 +1576,11 @@ int i;
                     getPair();
                     addr = get_addr(src);
 
-                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
 
                     set_addr(src,addr);
@@ -1276,11 +1594,11 @@ int i;
                         temp = get_addr(src) - app_size;
                         addr = temp;
 
-                        byte_sub(app_reg[dest][0],app_memory[addr++]);
+                        byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                         for (i=1;i<app_size;i++)
                         {
-                            byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                            byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                         }
                         set_addr(src,temp);
                     }
@@ -1291,11 +1609,11 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(src) + disp * app_size;
 
-                    byte_sub(app_reg[dest][0],app_memory[addr++]);
+                    byte_sub(app_reg[dest].B[0],app_memory[addr++]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_reg[dest][i],app_memory[addr++]);
+                        byte_sbc(app_reg[dest].B[i],app_memory[addr++]);
                     }
                     break;
 
@@ -1303,11 +1621,11 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    byte_sub(app_memory[addr++],app_reg[src][0]);
+                    byte_sub(app_memory[addr++],app_reg[src].B[0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr++],app_reg[src][i]);
+                        byte_sbc(app_memory[addr++],app_reg[src].B[i]);
                     }
                     break;
 
@@ -1315,11 +1633,11 @@ int i;
                     getPair();
                     addr = get_addr(dest);
 
-                    byte_sub(app_memory[addr++],app_reg[src][0]);
+                    byte_sub(app_memory[addr++],app_reg[src].B[0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr++],app_reg[src][i]);
+                        byte_sbc(app_memory[addr++],app_reg[src].B[i]);
                     }
                     set_addr(dest,addr);
                     break;
@@ -1332,11 +1650,11 @@ int i;
                         temp = get_addr(dest) - app_size;
                         addr = temp;
 
-                        byte_sub(app_memory[addr++],app_reg[src][0]);
+                        byte_sub(app_memory[addr++],app_reg[src].B[0]);
 
                         for (i=1;i<app_size;i++)
                         {
-                            byte_sbc(app_memory[addr++],app_reg[src][i]);
+                            byte_sbc(app_memory[addr++],app_reg[src].B[i]);
                         }
 
                         set_addr(dest,temp);
@@ -1348,11 +1666,11 @@ int i;
                     disp = app_memory[app_pc++];
                     addr = get_addr(dest) + disp * app_size;
 
-                    byte_sub(app_memory[addr++],app_reg[src][0]);
+                    byte_sub(app_memory[addr++],app_reg[src].B[0]);
 
                     for (i=1;i<app_size;i++)
                     {
-                        byte_sbc(app_memory[addr++],app_reg[src][i]);
+                        byte_sbc(app_memory[addr++],app_reg[src].B[i]);
                     }
                     break;
 
@@ -1361,12 +1679,24 @@ int i;
             }
             break;
 
-        case 0xF0: //r,#
-            byte_sub(app_reg[reg][0],app_memory[app_pc++]);
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            byte_sub(app_reg[reg].B[0],app_memory[addr++]);
 
             for (i=1;i<app_size;i++)
             {
-                byte_sbc(app_reg[reg][i],app_memory[app_pc++]);
+                byte_sbc(app_reg[reg].B[i],app_memory[addr++]);
+            }
+            break;
+
+        case 0xF0: //r,#
+            byte_sub(app_reg[reg].B[0],app_memory[app_pc++]);
+
+            for (i=1;i<app_size;i++)
+            {
+                byte_sbc(app_reg[reg].B[i],app_memory[app_pc++]);
             }
             break;
 
@@ -1386,13 +1716,46 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] &= app_reg[src][i];
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] &= app_reg[src].B[i2];
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] &= app_reg[src].W[i2];
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] &= app_reg[src].D[i2];
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] &= app_reg[src].Q[i2];
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] &= app_reg[src].B[i];
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -1402,7 +1765,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] &= app_memory[addr++];
+                        app_reg[dest].B[i] &= app_memory[addr++];
                     }
                     break;
 
@@ -1413,7 +1776,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] &= app_memory[addr++];
+                        app_reg[dest].B[i] &= app_memory[addr++];
                     }
                     break;
 
@@ -1435,7 +1798,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] &= app_memory[addr++];
+                        app_reg[dest].B[i] &= app_memory[addr++];
                     }
                     break;
 
@@ -1445,7 +1808,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] &= app_memory[addr++];
+                        app_reg[dest].B[i] &= app_memory[addr++];
                     }
 
                     set_addr(src,addr);
@@ -1461,7 +1824,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] &= app_memory[addr++];
+                            app_reg[dest].B[i] &= app_memory[addr++];
                         }
                         set_addr(src,temp);
                     }
@@ -1474,7 +1837,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] &= app_memory[addr++];
+                        app_reg[dest].B[i] &= app_memory[addr++];
                     }
                     break;
 
@@ -1484,7 +1847,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] &= app_reg[src][i];
+                        app_memory[addr++] &= app_reg[src].B[i];
                     }
                     break;
 
@@ -1494,7 +1857,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] &= app_reg[src][i];
+                        app_memory[addr++] &= app_reg[src].B[i];
                     }
                     set_addr(dest,addr);
                     break;
@@ -1509,7 +1872,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                             app_memory[addr++] &= app_reg[src][i];
+                             app_memory[addr++] &= app_reg[src].B[i];
                         }
 
                         set_addr(dest,temp);
@@ -1523,7 +1886,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] &= app_reg[src][i];
+                        app_memory[addr++] &= app_reg[src].B[i];
                     }
                     break;
 
@@ -1532,10 +1895,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=1;i<app_size;i++)
+            {
+                app_reg[reg].B[i] &= app_memory[addr++];
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] &= app_memory[app_pc++];
+                app_reg[reg].B[i] &= app_memory[app_pc++];
             }
             break;
 
@@ -1555,13 +1928,46 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] |= app_reg[src][i];
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] |= app_reg[src].B[i2];
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] |= app_reg[src].W[i2];
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] |= app_reg[src].D[i2];
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] |= app_reg[src].Q[i2];
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] |= app_reg[src].B[i];
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -1571,7 +1977,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] |= app_memory[addr++];
+                        app_reg[dest].B[i] |= app_memory[addr++];
                     }
                     break;
 
@@ -1582,7 +1988,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] |= app_memory[addr++];
+                        app_reg[dest].B[i] |= app_memory[addr++];
                     }
                     break;
 
@@ -1604,7 +2010,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] |= app_memory[addr++];
+                        app_reg[dest].B[i] |= app_memory[addr++];
                     }
                     break;
 
@@ -1614,7 +2020,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] |= app_memory[addr++];
+                        app_reg[dest].B[i] |= app_memory[addr++];
                     }
 
                     set_addr(src,addr);
@@ -1630,7 +2036,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] |= app_memory[addr++];
+                            app_reg[dest].B[i] |= app_memory[addr++];
                         }
 
                         set_addr(src,temp);
@@ -1644,7 +2050,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] |= app_memory[addr++];
+                        app_reg[dest].B[i] |= app_memory[addr++];
                     }
                     break;
 
@@ -1654,7 +2060,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] |= app_reg[src][i];
+                        app_memory[addr++] |= app_reg[src].B[i];
                     }
                     break;
 
@@ -1664,7 +2070,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] |= app_reg[src][i];
+                        app_memory[addr++] |= app_reg[src].B[i];
                     }
                     set_addr(dest,addr);
                     break;
@@ -1679,7 +2085,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                             app_memory[addr++] |= app_reg[src][i];
+                             app_memory[addr++] |= app_reg[src].B[i];
                         }
 
                         set_addr(dest,temp);
@@ -1693,7 +2099,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] |= app_reg[src][i];
+                        app_memory[addr++] |= app_reg[src].B[i];
                     }
                     break;
 
@@ -1702,10 +2108,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=1;i<app_size;i++)
+            {
+                app_reg[reg].B[i] |= app_memory[addr++];
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] |= app_memory[app_pc++];
+                app_reg[reg].B[i] |= app_memory[app_pc++];
             }
             break;
 
@@ -1725,13 +2141,46 @@ int i;
     switch(adr_mode & 0xf0)
     {
         case 0:
-            getPair();
-
-            for (i=0;i<app_size;i++)
+            if (extended)
             {
-                app_reg[dest][i] ^= app_reg[src][i];
+                getRegIndex();
+
+                switch(app_size)
+                {
+                    case 1:
+                        i1 = temp1 & 0x0f;
+                        i2 = temp2 & 0x0f;
+                        app_reg[dest].B[i1] ^= app_reg[src].B[i2];
+                        break;
+                    case 2:
+                        i1 = temp1 & 0x07;
+                        i2 = temp2 & 0x07;
+                        app_reg[dest].W[i1] ^= app_reg[src].W[i2];
+                        break;
+                    case 4:
+                        i1 = temp1 & 0x03;
+                        i2 = temp2 & 0x03;
+                        app_reg[dest].D[i1] ^= app_reg[src].D[i2];
+                        break;
+                    case 8:
+                        i1 = temp1 & 0x01;
+                        i2 = temp2 & 0x01;
+                        app_reg[dest].Q[i1] ^= app_reg[src].Q[i2];
+                        break;
+                    default:
+                        illegal_inst();
+                }
             }
-            setflags(app_reg[dest]);
+            else
+            {
+                getPair();
+
+                for (i=0;i<app_size;i++)
+                {
+                    app_reg[dest].B[i] ^= app_reg[src].B[i];
+                }
+                setflags(&app_reg[dest].B[0]);
+            }
             break;
         case 0x30:
             switch (adr_mode)
@@ -1741,7 +2190,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] ^= app_memory[addr++];
+                        app_reg[dest].B[i] ^= app_memory[addr++];
                     }
                     break;
 
@@ -1752,7 +2201,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] ^= app_memory[addr++];
+                        app_reg[dest].B[i] ^= app_memory[addr++];
                     }
                     break;
 
@@ -1774,7 +2223,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] ^= app_memory[addr++];
+                        app_reg[dest].B[i] ^= app_memory[addr++];
                     }
                     break;
 
@@ -1784,7 +2233,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] ^= app_memory[addr++];
+                        app_reg[dest].B[i] ^= app_memory[addr++];
                     }
 
                     set_addr(src,addr);
@@ -1800,7 +2249,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                            app_reg[dest][i] ^= app_memory[addr++];
+                            app_reg[dest].B[i] ^= app_memory[addr++];
                         }
                         set_addr(src,temp);
                     }
@@ -1813,7 +2262,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_reg[dest][i] ^= app_memory[addr++];
+                        app_reg[dest].B[i] ^= app_memory[addr++];
                     }
                     break;
 
@@ -1823,7 +2272,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] ^= app_reg[src][i];
+                        app_memory[addr++] ^= app_reg[src].B[i];
                     }
                     break;
 
@@ -1833,7 +2282,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] ^= app_reg[src][i];
+                        app_memory[addr++] ^= app_reg[src].B[i];
                     }
                     set_addr(dest,addr);
                     break;
@@ -1848,7 +2297,7 @@ int i;
 
                         for (i=0;i<app_size;i++)
                         {
-                             app_memory[addr++] ^= app_reg[src][i];
+                             app_memory[addr++] ^= app_reg[src].B[i];
                         }
 
                         set_addr(dest,temp);
@@ -1862,7 +2311,7 @@ int i;
 
                     for (i=0;i<app_size;i++)
                     {
-                        app_memory[addr++] ^= app_reg[src][i];
+                        app_memory[addr++] ^= app_reg[src].B[i];
                     }
                     break;
 
@@ -1871,10 +2320,20 @@ int i;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            addr = getword(app_pc);
+            app_pc +=2;
+
+            for (i=1;i<app_size;i++)
+            {
+                app_reg[reg].B[i] ^= app_memory[addr++];
+            }
+            break;
+
         case 0xF0: //r,#
             for (i=0;i<app_size;i++)
             {
-                app_reg[reg][i] ^= app_memory[app_pc++];
+                app_reg[reg].B[i] ^= app_memory[app_pc++];
             }
             break;
 
@@ -1883,9 +2342,79 @@ int i;
     }
 }
 
-/* flags STHIVNZC
-         *-----**
-*/
+void op_msk(uint128_t *reg)
+{
+    switch(app_size)
+    {
+    case 1:
+        reg->B[0] = 1 << (reg->B[0] & 0x07);
+        break;
+    case 2:
+        reg->W[0] = 1 << (reg->B[0] & 0x0F);
+        break;
+    case 4:
+        reg->D[0] = 1 << (reg->B[0] & 0x1F);
+        break;
+    case 8:
+        reg->Q[0] = 1ULL << (reg->B[0] & 0x3F);
+        break;
+    case 16:
+        {
+            uint64_t temp = (1ULL << (reg->B[0] & 0x3F));
+
+            if (reg->B[0] & 0x40)
+            {
+                reg->Q[0] = 0;
+                reg->Q[1] = temp;
+            }
+            else
+            {
+                reg->Q[0] = temp;
+                reg->Q[1] = 0;
+            }
+        }
+        break;
+    }
+}
+
+void op_swap(uint128_t *reg)
+{
+    switch(app_size)
+    {
+    case 1:
+        reg->B[0] = swap_byte(reg->B[0]);
+        break;
+    case 2:
+        {
+            uint8_t temp = reg->B[0];
+            reg->B[0] = reg->B[1];
+            reg->B[1] = temp;
+        }
+        break;
+    case 4:
+        {
+            uint16_t temp = reg->W[0];
+            reg->W[0] = reg->W[1];
+            reg->W[1] = temp;
+        }
+        break;
+    case 8:
+        {
+            uint32_t temp = reg->D[0];
+            reg->D[0] = reg->D[1];
+            reg->D[1] = temp;
+        }
+        break;
+    case 16:
+        {
+            uint64_t temp = reg->Q[0];
+            reg->Q[0] = reg->Q[1];
+            reg->Q[1] = temp;
+        }
+        break;
+    }
+}
+
 void op_inc(uint8_t reg[])
 {
 int i;
@@ -1914,48 +2443,110 @@ int i;
 
 void op_in(void)
 {
-uint8_t port;
 int result, val;
 
-    port = app_memory[app_pc++];
-    if (step_mode) wprintw(wConsole,"IN: [%02X] = ",port);
-
-    result = scanw("%02X",&val);
-    if (step_mode) wprintw(wConsole,"Result: %02X, Input: %02X\n",result,val & 0xff);
-
-    if ((adr_mode & 0xf0) == 0xF0)
+    if (extended)
     {
-        app_reg[adr_mode & 0xf][0] = val & 0xff;
+        getPair();
+
+        if (step_mode) wprintw(wConsole,"IN: R%d,(R%d) = ", dest, src);
+
+        result = scanw("%02X",&val);
+        if (step_mode) wprintw(wConsole,"Result: %02X, Input: %02X\n",result,val & 0xff);
+        app_reg[dest].B[0] = val & 0xff;
     }
     else
     {
-        app_reg[0][0] = val & 0xff;
+        uint8_t port = app_memory[app_pc++];
+
+        if (step_mode) wprintw(wConsole,"IN: (%02X) = ",port);
+
+        if (app_size == 2)
+        {
+            result = scanw("%04X",&val);
+            if (step_mode) wprintw(wConsole,"Result: %02X, Input: %04X\n",result,val & 0xffff);
+
+            if ((adr_mode & 0xf0) == 0xF0)
+            {
+                app_reg[adr_mode & 0xf].W[0] = val & 0xffff;
+            }
+            else
+            {
+                app_reg[0].W[0] = val & 0xffff;
+            }
+        }
+        else
+        {
+            result = scanw("%02X",&val);
+            if (step_mode) wprintw(wConsole,"Result: %02X, Input: %02X\n",result,val & 0xff);
+
+            if ((adr_mode & 0xf0) == 0xF0)
+            {
+                app_reg[adr_mode & 0xf].B[0] = val & 0xff;
+            }
+            else
+            {
+                app_reg[0].B[0] = val & 0xff;
+            }
+        }
     }
 }
 
 void op_out(void)
 {
-uint8_t port,val;
-    port = app_memory[app_pc++];
+uint8_t val;
 
-    if ((adr_mode & 0xf0) == 0xF0)
+    if (extended)
     {
-        val = app_reg[adr_mode & 0xf][0];
-    }
-    else
-    {
-        val = app_reg[0][0];
-    }
-    if (step_mode)
-    {
-        wprintw(wConsole,"OUT: [%02X] = %02X\n",port,val);
-    }
-    else
-    {
-        if (port == 0xFF)
+        getPair();
+
+        if (step_mode)
         {
-            addch(val);
-            refresh();
+            val = app_reg[src].B[0];
+            wprintw(wConsole,"OUT: (R%d),R%d ; (%02X) = %02X\n",dest, src, app_reg[dest].B[0], val);
+        }
+    }
+    else
+    {
+        uint8_t port = app_memory[app_pc++];
+
+        if (app_size == 2)
+        {
+            if ((adr_mode & 0xf0) == 0xF0)
+            {
+                val = app_reg[adr_mode & 0xf].W[0];
+            }
+            else
+            {
+                val = app_reg[0].W[0];
+            }
+            if (step_mode)
+            {
+                wprintw(wConsole,"OUT: (%02X) = %04X\n",port,val);
+            }
+        }
+        else
+        {
+            if ((adr_mode & 0xf0) == 0xF0)
+            {
+                val = app_reg[adr_mode & 0xf].B[0];
+            }
+            else
+            {
+                val = app_reg[0].B[0];
+            }
+            if (step_mode)
+            {
+                wprintw(wConsole,"OUT: (%02X) = %02X\n",port,val);
+            }
+            else
+            {
+                if (port == 0xFF)
+                {
+                    addch(val);
+                    refresh();
+                }
+            }
         }
     }
 }
@@ -1992,9 +2583,9 @@ int temp, temp_cy;
 
             for (j=0;j<app_size;j++)
             {
-                temp = (app_reg[reg][j] << 1) | (app_flags & FLAG_C_MASK);
+                temp = (app_reg[reg].B[j] << 1) | (app_flags & FLAG_C_MASK);
                 app_flags = ((temp & 0x100) >> 8) | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
     }
@@ -2004,14 +2595,14 @@ int temp, temp_cy;
         for (i=0;i<nb_shifts;i++)
         {
             /* Get sign bit */
-            app_flags = (app_flags & ~FLAG_C_MASK) | ((app_reg[reg][app_size-1] & 0x80) >> 7);
+            app_flags = (app_flags & ~FLAG_C_MASK) | ((app_reg[reg].B[app_size-1] & 0x80) >> 7);
 
             for (j=0;j<app_size;j++)
             {
-                temp_cy = (app_reg[reg][j] & 0x01);
-                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg][j] >> 1);
+                temp_cy = (app_reg[reg].B[j] & 0x01);
+                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg].B[j] >> 1);
                 app_flags = temp_cy | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
     }
@@ -2045,9 +2636,9 @@ int temp, temp_cy;
         {
             for (j=0;j<app_size;j++)
             {
-                temp = (app_reg[reg][j] << 1) | (app_flags & FLAG_C_MASK);
+                temp = (app_reg[reg].B[j] << 1) | (app_flags & FLAG_C_MASK);
                 app_flags = ((temp & 0x100) >> 8) | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
     }
@@ -2058,10 +2649,10 @@ int temp, temp_cy;
         {
             for (j=0;j<app_size;j++)
             {
-                temp_cy = (app_reg[reg][j] & 0x01);
-                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg][j] >> 1);
+                temp_cy = (app_reg[reg].B[j] & 0x01);
+                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg].B[j] >> 1);
                 app_flags = temp_cy | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
     }
@@ -2093,9 +2684,9 @@ int temp, temp_cy;
 
             for (j=0;j<app_size;j++)
             {
-                temp = (app_reg[reg][j] << 1) | (app_flags & FLAG_C_MASK);
+                temp = (app_reg[reg].B[j] << 1) | (app_flags & FLAG_C_MASK);
                 app_flags = ((temp & 0x100) >> 8) | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
     }
@@ -2109,12 +2700,146 @@ int temp, temp_cy;
 
             for (j=0;j<app_size;j++)
             {
-                temp_cy = (app_reg[reg][j] & 0x01);
-                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg][j] >> 1);
+                temp_cy = (app_reg[reg].B[j] & 0x01);
+                temp = ((app_flags & FLAG_C_MASK) << 7) | (app_reg[reg].B[j] >> 1);
                 app_flags = temp_cy | (app_flags & ~FLAG_C_MASK);
-                app_reg[reg][j] = temp & 0xff;
+                app_reg[reg].B[j] = temp & 0xff;
             }
         }
+    }
+}
+
+void op_umul(void)
+{
+    getPair();
+
+    switch(app_size)
+    {
+    case 1:
+        {
+            uint16_t result = app_reg[dest].B[0] * app_reg[src].B[0];
+
+            app_reg[src].B[0] = result & 0xff;
+            if (result > 256) app_flags |= FLAG_V_MASK;
+        }
+        break;
+    case 2:
+        app_reg[dest].W[0] = app_reg[dest].B[0] * app_reg[src].B[0];
+        break;
+    case 4:
+        app_reg[dest].D[0] = app_reg[dest].W[0] * app_reg[src].W[0];
+        break;
+    case 8:
+        app_reg[dest].Q[0] = app_reg[dest].D[0] * app_reg[src].D[0];
+        break;
+    case 16:
+        //app_reg[dest].D[0] = app_reg[dest].W[0] * app_reg[src].W[0];
+        //TBD
+        break;
+    }
+}
+
+void op_udiv(void)
+{
+    getPair();
+
+    switch(app_size)
+    {
+    case 1:
+        if (app_reg[src].B[0] != 0)
+        {
+            app_reg[dest].B[0] = app_reg[dest].B[0] / app_reg[src].B[0];
+        }
+        break;
+    case 2:
+        if (app_reg[src].B[0] != 0)
+        {
+            app_reg[dest].W[0] = app_reg[dest].W[0] / app_reg[src].B[0];
+        }
+        break;
+    case 4:
+        if (app_reg[src].W[0] != 0)
+        {
+            app_reg[dest].D[0] = app_reg[dest].D[0] / app_reg[src].W[0];
+        }
+        break;
+    case 8:
+        if (app_reg[src].D[0] != 0)
+        {
+            app_reg[dest].Q[0] = app_reg[dest].Q[0] / app_reg[src].D[0];
+        }
+        break;
+    case 16:
+        //app_reg[dest].D[0] = app_reg[dest].W[0] * app_reg[src].W[0];
+        //TBD
+        break;
+    }
+}
+
+void op_smul(void)
+{
+    getPair();
+
+    switch(app_size)
+    {
+    case 1:
+        {
+            int16_t result = (int8_t) app_reg[dest].B[0] * (int8_t) app_reg[src].B[0];
+
+            app_reg[src].B[0] = result & 0xff;
+            if (result > 256) app_flags |= FLAG_V_MASK;
+        }
+        break;
+    case 2:
+        app_reg[dest].W[0] = (int8_t) app_reg[dest].B[0] * (int8_t) app_reg[src].B[0];
+        break;
+    case 4:
+        app_reg[dest].D[0] = (int16_t) app_reg[dest].W[0] * (int16_t) app_reg[src].W[0];
+        break;
+    case 8:
+        app_reg[dest].Q[0] = (int32_t) app_reg[dest].D[0] * (int32_t) app_reg[src].D[0];
+        break;
+    case 16:
+        //app_reg[dest].D[0] = app_reg[dest].W[0] * app_reg[src].W[0];
+        //TBD
+        break;
+    }
+}
+
+void op_sdiv(void)
+{
+    getPair();
+
+    switch(app_size)
+    {
+    case 1:
+        if (app_reg[src].B[0] != 0)
+        {
+            app_reg[dest].B[0] = (int8_t) app_reg[dest].B[0] / (int8_t) app_reg[src].B[0];
+        }
+        break;
+    case 2:
+        if (app_reg[src].B[0] != 0)
+        {
+            app_reg[dest].W[0] = (int16_t) app_reg[dest].W[0] / (int8_t) app_reg[src].B[0];
+        }
+        break;
+    case 4:
+        if (app_reg[src].W[0] != 0)
+        {
+            app_reg[dest].D[0] = (int32_t) app_reg[dest].D[0] / (int16_t) app_reg[src].W[0];
+        }
+        break;
+    case 8:
+        if (app_reg[src].D[0] != 0)
+        {
+            app_reg[dest].Q[0] = (int64_t) app_reg[dest].Q[0] / (int32_t) app_reg[src].D[0];
+        }
+        break;
+    case 16:
+        //app_reg[dest].D[0] = app_reg[dest].W[0] * app_reg[src].W[0];
+        //TBD
+        break;
     }
 }
 

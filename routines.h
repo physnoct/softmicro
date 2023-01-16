@@ -2,7 +2,9 @@
 #define _ROUTINES_H_
 
 extern uint8_t reg_pair,src,dest;
+extern uint8_t temp1,temp2,i1,i2;
 
+void getRegIndex(void);
 void getPair(void);
 void illegal_inst(void);
 
@@ -22,10 +24,21 @@ int8_t byte_sbc(int8_t a, int8_t b);
 uint8_t swap_byte(uint8_t byte);
 uint8_t reverse_byte(uint8_t byte);
 uint8_t daa_byte(uint8_t byte);
+//uint8_t toupper(uint8_t byte);
+//uint8_t tolower(uint8_t byte);
 uint8_t toa_byte(uint8_t byte);
 uint8_t toh_byte(uint8_t byte);
+
+uint64_t bin_quad(uint64_t bcd_value);
+uint32_t bin_double(uint32_t bcd_value);
+uint16_t bin_word(uint16_t bcd_value);
+uint8_t bin_byte(uint8_t bcd_value);
+
+uint64_t bcd_quad(uint64_t bin_value);
+uint32_t bcd_double(uint32_t bin_value);
+uint16_t bcd_word(uint16_t bin_value);
 uint8_t bcd_byte(uint8_t byte);
-uint8_t bin_byte(uint8_t byte);
+
 uint8_t sxt_byte(void);
 
 int16_t get_addr(uint8_t reg);
@@ -45,8 +58,9 @@ void branch2(uint8_t opcode);
 void br_sbr(void);
 void br_always(void);
 void bsr_cond(uint8_t param);
-void mcpdr(uint8_t param);
-void mcpir(uint8_t param);
+void ret_cond(uint8_t param);
+void lddr(uint8_t param);
+void ldir(uint8_t param);
 void mswap(uint8_t param);
 
 void wait_port(uint8_t param);
@@ -58,6 +72,7 @@ void dec(uint8_t param);
 void sfl(uint8_t param);
 void push(uint8_t param);
 void pop(uint8_t param);
+void ind_jmp(uint8_t param);
 void ind_call(uint8_t param);
 void ind_bsr(uint8_t param);
 

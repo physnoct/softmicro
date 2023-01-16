@@ -1,13 +1,15 @@
 #include "softmicro.h"
 
+uint8_t hvect;
 uint8_t app_memory[65536];
-uint8_t app_reg[16][16];
+uint128_t app_reg[16];
 uint8_t app_flags;
-int16_t app_pc;
+uint16_t app_pc;
 uint8_t app_size,adr_mode;
 uint8_t size_byte;
 bool step_mode = true;
 bool run_until_ret = false;
+bool extended = false;
 
 void OpStep(void)
 {
@@ -17,6 +19,7 @@ int16_t temp;
     app_size = 1;
     adr_mode = 0;
     size_byte = 0;
+    extended = false;
 
     op_code = app_memory[app_pc++];
 
@@ -178,11 +181,24 @@ int16_t temp;
             case 0x1b: // BIT toggle
                 test_toggle_bit();
                 break;
-            case 0x1c: // BIT test
-                //unassigned
-                break;
-            case 0x1d: // BIT wait
+            case 0x1c: // BIT wait
                 wait_bit();
+                break;
+            case 0x1d: // IORES/SET
+                { /*
+                    uint8_t temp = SoftMicroMemRd(app_pc++);
+                    uint8_t port = app_reg[temp & 0x0f].B[0];
+                    uint8_t l_bit = (temp >> 4) & 0x07;
+
+                    if ((temp & 0x80) != 0)
+                    {
+                        SoftMicroIoWr(port, SoftMicroIoRd(port) | (1 << l_bit));
+                    }
+                    else
+                    {
+                        SoftMicroIoWr(port, SoftMicroIoRd(port) & ~(1 << l_bit));
+                    } */
+                }
                 break;
             case 0x1e: // IN
                 op_in();
@@ -203,25 +219,25 @@ int16_t temp;
 
             /* Unary ops */
             case 0x23: // TOA
-                app_reg[0][0] = toa_byte(app_reg[0][0]);
+                app_reg[0].B[0] = toa_byte(app_reg[0].B[0]);
                 break;
             case 0x24: // TOH
-                app_reg[0][0] = toh_byte(app_reg[0][0]);
+                app_reg[0].B[0] = toh_byte(app_reg[0].B[0]);
                 break;
             case 0x25: // LDF
-                app_reg[0][0] = app_flags;
+                app_reg[0].B[0] = app_flags;
                 break;
             case 0x26: // STF
-                app_flags = app_reg[0][0];
+                app_flags = app_reg[0].B[0];
                 break;
             case 0x27: // MSK
-                app_reg[0][0] = 1 << (app_reg[0][0] & 0x07);
+                op_msk(&app_reg[0]);
                 break;
-            case 0x28: // SWAP
-                app_reg[0][0] = swap_byte(app_reg[0][0]);
+            case 0x28: // SWAP nibbles
+                op_swap(&app_reg[0]);
                 break;
             case 0x29: // REV
-                app_reg[0][0] = reverse_byte(app_reg[0][0]);
+                app_reg[0].B[0] = reverse_byte(app_reg[0].B[0]);
                 break;
             case 0x2a: // SXT
                 op_sxt();
@@ -374,11 +390,21 @@ uint8_t op_code,param;
             case 0x19: //EX
                 op_ex();
                 break;
-
+            case 0x1e: // IN
+                op_in();
+                break;
+            case 0x1f: // OUT
+                op_out();
+                break;
+            case 0x27: // MSK
+                op_msk(&app_reg[0]);
+                break;
+            case 0x28: // SWAP
+                op_swap(&app_reg[0]);
+                break;
             case 0x29: // REV
                 op_rev();
                 break;
-
             case 0x2a: // SXT
                 op_sxt();
                 break;
@@ -482,7 +508,7 @@ uint8_t op_code,param;
                 ind_bsr(param);
                 break;
             case 0x0a: //JMP
-                //TBD
+                ind_jmp(param);
                 break;
             case 0x10: //LD
                 op_load();
@@ -514,26 +540,63 @@ uint8_t op_code,param;
             case 0x19: //EX
                 op_ex();
                 break;
-            case 0x1e: // IN
+            case 0x1d: // IORES/SET
+                switch (adr_mode & 0xf0)
+                {
+                case 0xe0:
+                    op_st();
+                    break;
+                case 0xf0:
+                    { /*
+                        uint8_t port = SoftMicroMemRd(app_pc++);
+                        uint8_t l_bit = param & 0x07;
+
+                        if ((param & 0x8) != 0)
+                        {
+                            SoftMicroIoWr(port, SoftMicroIoRd(port) | (1 << l_bit));
+                        }
+                        else
+                        {
+                            SoftMicroIoWr(port, SoftMicroIoRd(port) & ~(1 << l_bit));
+                        }*/
+                    }
+                    break;
+                default:
+                    illegal_inst();
+                }
+                break;
+            case 0x1e: //IN
                 op_in();
                 break;
-            case 0x1f: // OUT
+            case 0x1f: //OUT
                 op_out();
                 break;
 
-            case 0x29: // REV
+            case 0x27: //MSK
+                op_msk(&app_reg[param]);
+                break;
+            case 0x28: //SWAP
+                op_swap(&app_reg[param]);
+                break;
+            case 0x29: //REV
                 op_rev();
                 break;
-            case 0x2a: // SXT
+            case 0x2a: //SXT
                 op_sxt();
                 break;
-            case 0x2b: // CPL
+            case 0x2b: //CPL
                 op_cpl();
                 break;
-            case 0x2c: // NEG
+            case 0x2c: //NEG
                 op_neg();
                 break;
-
+            case 0x3c ... 0x3f:
+            case 0x4c ... 0x4f:
+                {
+                    uint8_t temp = app_memory[app_pc++];
+                    if (step_mode) wprintw(wConsole,"Z80 IO inst: (R%d),(R%d),R%d\n", temp >> 4, temp & 0x0f, param);
+                }
+                break;
             default:
                 illegal_inst();
         }
@@ -543,6 +606,8 @@ uint8_t op_code,param;
 void OpExtended(void)
 {
 uint8_t op_code,param;
+
+    extended = true;
 
     op_code = app_memory[app_pc++];
 
@@ -557,14 +622,17 @@ uint8_t op_code,param;
             case 0x60:
                 bsr_cond(param);
                 break;
+            case 0x70:
+                ret_cond(param);
+                break;
             case 0xD0:
                 mswap(param);
                 break;
             case 0xE0:
-                mcpdr(param);
+                lddr(param);
                 break;
             case 0xF0:
-                mcpir(param);
+                ldir(param);
                 break;
             default:
                 illegal_inst();
@@ -575,61 +643,159 @@ uint8_t op_code,param;
         switch(op_code)
         {
             case 0x00: //VER
-                app_reg[0][0] = SOFT_MICRO_INST_SET_VERSION;
+                app_reg[0].B[0] = SOFT_MICRO_INST_SET_VERSION;
                 break;
             case 0x01: //SN
-                app_reg[0][0] = 0xEF;
-                app_reg[0][1] = 0xBE;
-                app_reg[0][2] = 0xAD;
-                app_reg[0][3] = 0xDE;
-                app_reg[0][4] = 0xBE;
-                app_reg[0][5] = 0xBA;
-                app_reg[0][6] = 0xED;
-                app_reg[0][7] = 0xFE;
+                app_reg[0].Q[0] = 0xFEEDBABEDEADBEEF;
                 break;
             case 0x02: //HALT
                 app_pc-=2;
                 wprintw(wConsole,"Halt\n");
                 step_mode = true;
                 break;
-            case 0x03: // CLR H
+            case 0x03: //CLR H
                 app_flags &= ~FLAG_H_MASK;
                 break;
-            case 0x04: // SET H
+            case 0x04: //SET H
                 app_flags |= FLAG_H_MASK;
                 break;
-            case 0x05: // TOG H
+            case 0x05: //TOG H
                 app_flags ^= FLAG_H_MASK;
                 break;
-            case 0x06: // CLR T
+            case 0x06: //CLR T
                 app_flags &= ~FLAG_T_MASK;
                 break;
-            case 0x07: // SET T
+            case 0x07: //SET T
                 app_flags |= FLAG_T_MASK;
                 break;
-            case 0x08: // TOG T
+            case 0x08: //TOG T
                 app_flags ^= FLAG_T_MASK;
                 break;
-            case 0x09: // BCD
-                app_reg[0][0] = bcd_byte(app_reg[0][0]);
+            case 0x09: //BIN to BCD
+                switch(app_size)
+                {
+                    case 1:
+                        app_reg[0].B[0] = bcd_byte(app_reg[0].B[0]);
+                        break;
+                    case 2:
+                        app_reg[0].W[0] = bcd_word(app_reg[0].W[0]);
+                        break;
+                    case 4:
+                        app_reg[0].D[0] = bcd_double(app_reg[0].D[0]);
+                        break;
+                    case 8:
+                        app_reg[0].Q[0] = bcd_quad(app_reg[0].Q[0]);
+                        break;
+                    case 16:
+                        //FIXME to be implemented?
+                        break;
+                }
                 break;
-            case 0x0A: // BIN
-                app_reg[0][0] = bin_byte(app_reg[0][0]);
+            case 0x0A: //BCD to BIN
+                switch(app_size)
+                {
+                    case 1:
+                        app_reg[0].B[0] = bin_byte(app_reg[0].B[0]);
+                        break;
+                    case 2:
+                        app_reg[0].W[0] = bin_word(app_reg[0].W[0]);
+                        break;
+                    case 4:
+                        app_reg[0].D[0] = bin_double(app_reg[0].D[0]);
+                        break;
+                    case 8:
+                        app_reg[0].Q[0] = bin_quad(app_reg[0].Q[0]);
+                        break;
+                    case 16:
+                        //FIXME to be implemented?
+                        break;
+                }
                 break;
             case 0x0B: // RAND
                 op_rand();
                 break;
-            case 0x10: // STEP
+            case 0x0F: // STEP
                 step_mode = true;
                 wprintw(wConsole,"Step\n");
                 break;
-            case 0x20: // VASM
-                app_reg[0][1] = app_memory[app_pc++];
-                wprintw(wConsole,"Assembler instruction set version: %d\n",app_reg[0][1]);
+            case 0x10: //LD
+                op_load();
                 break;
-            case 0x21: // MFILL
+            case 0x11: //ADD
+                op_add();
+                break;
+            case 0x12: //ADC
+                op_adc();
+                break;
+            case 0x13: //SUB
+                op_sub();
+                break;
+            case 0x14: //SBC
+                op_sbc();
+                break;
+            case 0x15: //AND
+                op_and();
+                break;
+            case 0x16: //OR
+                op_or();
+                break;
+            case 0x17: //XOR
+                op_xor();
+                break;
+            case 0x18: //CP
+                op_cp();
+                break;
+            case 0x19: //EX
+                op_ex();
+                break;
+            case 0x1C: //OUTV
+                {
+                    uint8_t port = app_memory[app_pc++];
+                    uint8_t value = app_memory[app_pc++];
+                    if (step_mode)
+                    {
+                        wprintw(wConsole,"OUT: (%02X) = %02X\n",port,value);
+                    }
+            	}
+                break;
+            case 0x1E: //IN
+                op_in();
+                break;
+            case 0x1F: //OUT
+                op_out();
+                break;
+            case 0x20: //VASM
+                app_reg[0].B[1] = app_memory[app_pc++];
+                wprintw(wConsole,"Assembler instruction set version: %d\n",app_reg[0].B[1]);
+                break;
+            case 0x21: //MFILL
                 mfill();
                 break;
+            case 0x23: //TOUP
+                app_reg[0].B[0] = toupper(app_reg[0].B[0]);
+                break;
+            case 0x24: //TOLO
+                app_reg[0].B[0] = tolower(app_reg[0].B[0]);
+                break;
+            case 0x25: //LDV
+                app_reg[0].B[0] = hvect;
+                break;
+            case 0x26: //STV
+                hvect = app_reg[0].B[0];
+                break;
+            case 0x27: //UMUL
+                op_umul();
+                break;
+            case 0x28: //UDIV
+                op_udiv();
+                break;
+            case 0x29: //SMUL
+                op_smul();
+                break;
+            case 0x2A: //SDIV
+                op_sdiv();
+                break;
+
             default:
                 illegal_inst();
         }

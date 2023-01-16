@@ -69,7 +69,7 @@ int i,j;
     wbkgd(w,COLOR_PAIR(4));
     wclear(w);
 
-    wprintw(w,"Flags: S T H I V N Z C\n       ");
+    wprintw(w,"Flags: S T H I V N Z C\tInt Vect: %02X\n       ",hvect);
     PrintBinary2(w,app_flags);
 
     wprintw(w,"\n      f e d c b a 9 8 7 6 5 4 3 2 1 0\n");
@@ -80,7 +80,7 @@ int i,j;
 
         for (j=15;j>-1;j--)
         {
-            wprintw(w,"%02X",app_reg[i][j] & 0xFF);
+            wprintw(w,"%02X",app_reg[i].B[j] & 0xFF);
         }
         wprintw(w,"\n");
     }
@@ -121,7 +121,7 @@ int i,j;
     {
         for (j=0;j<16;j++)
         {
-            app_reg[i][j] = 0;
+            app_reg[i].B[j] = 0;
         }
     }
 }

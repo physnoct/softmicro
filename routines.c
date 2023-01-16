@@ -1,6 +1,15 @@
 #include "softmicro.h"
 
 uint8_t reg_pair,src,dest;
+uint8_t temp1,temp2,i1,i2;
+
+void getRegIndex(void)
+{
+    temp1 = app_memory[app_pc++];
+    temp2 = app_memory[app_pc++];
+    dest = temp1 >> 4;
+    src = temp2 >> 4;
+}
 
 void getPair(void)
 {
@@ -112,7 +121,7 @@ int i;
     wprintw(wConsole,"\n");
 }
 
-void mcpdr(uint8_t param)
+void lddr(uint8_t param)
 {
 int i = get_addr(param);
 uint16_t adr_src,adr_dest;
@@ -132,7 +141,7 @@ uint16_t adr_src,adr_dest;
     set_addr(dest,adr_dest);
 }
 
-void mcpir(uint8_t param)
+void ldir(uint8_t param)
 {
 int i = get_addr(param);
 uint16_t adr_src,adr_dest;
@@ -141,7 +150,7 @@ uint16_t adr_src,adr_dest;
     adr_src = get_addr(src);
     adr_dest = get_addr(dest);
 
-    wprintw(wConsole,"MCPIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
+    wprintw(wConsole,"LDIR: PC: %04X, pair: %02X, ctr: %02X\n",app_pc,reg_pair,param);
 
     do
     {
@@ -317,14 +326,6 @@ uint8_t reverse_byte(uint8_t byte)
         ((byte & 0x80) >> 7);
 }
 
-uint8_t daa_byte(uint8_t byte)
-{
-//uint8_t temp;
-    //temp = byte & 0x0f;
-    //FIXME
-    return 0;
-}
-
 /* Convert nibble to ASCII */
 uint8_t toa_byte(uint8_t byte)
 {
@@ -334,46 +335,180 @@ uint8_t temp;
     else return temp + 'A'-0x0a;
 }
 
-/* Convert hex ASCII to nibble */
+/* Convert hex ASCII to nibble
+    cy = 1 if not hex char
+*/
 uint8_t toh_byte(uint8_t byte)
 {
     if ((byte >= '0') && (byte < ('9'+1)))
     {
+        app_flags &= ~FLAG_C_MASK;
         return byte & 0x0f;
     }
     else
     {
         if ((byte >= 'A') && (byte < 'G'))
         {
+            app_flags &= ~FLAG_C_MASK;
             return byte - 'A' + 0x0a;
         }
         else
         {
             if ((byte >= 'a') && (byte < 'g'))
             {
+                app_flags &= ~FLAG_C_MASK;
                 return byte - 'a' + 0x0a;
             }
-            else return byte;
+            else
+            {
+                app_flags |= FLAG_C_MASK;
+                return byte;
+            }
         }
     }
 }
 
-uint8_t bcd_byte(uint8_t byte)
+uint64_t bin_quad(uint64_t bcd_value)
 {
-    if (byte > 99)
+int i, m_ten = 1;
+uint64_t result = 0;
+
+    for (i=0; i<16; i++)
+    {
+        result += (bcd_value & 0x0f) * m_ten;
+        bcd_value >>= 4;
+        m_ten *= 10;
+    }
+
+    return result;
+}
+
+uint32_t bin_double(uint32_t bcd_value)
+{
+int i, m_ten = 1;
+uint32_t result = 0;
+
+    for (i=0; i<8; i++)
+    {
+        result += (bcd_value & 0x0f) * m_ten;
+        bcd_value >>= 4;
+        m_ten *= 10;
+    }
+
+    return result;
+}
+
+uint16_t bin_word(uint16_t bcd_value)
+{
+int i, m_ten = 1;
+uint16_t result = 0;
+
+    for (i=0; i<4; i++)
+    {
+        result += (bcd_value & 0x0f) * m_ten;
+        bcd_value >>= 4;
+        m_ten *= 10;
+    }
+
+    return result;
+}
+
+uint8_t bin_byte(uint8_t bcd_value)
+{
+    return ((bcd_value & 0xf0)>>4)*10 + (bcd_value & 0x0f);
+}
+
+uint64_t bcd_quad(uint64_t bin_value)
+{
+int i;
+uint64_t ten;
+uint64_t result = 0, temp, reminder;
+
+    if (bin_value > 9999999999999999ULL)
+    {
+        app_flags |= FLAG_V_MASK;
+    }
+    else
+    {
+        i = 16;
+        ten = 1000000000000000ULL;
+        reminder = bin_value;
+
+        do
+        {
+            temp = reminder/ten;
+            reminder -= (temp * ten);
+            result |= (temp << ((i-1)*4));
+            ten /= 10;
+        } while (--i);
+    }
+    return result;
+}
+
+uint32_t bcd_double(uint32_t bin_value)
+{
+int i;
+uint32_t ten;
+uint32_t result = 0, temp, reminder;
+
+    if (bin_value > 99999999)
+    {
+        app_flags |= FLAG_V_MASK;
+    }
+    else
+    {
+        i = 8;
+        ten = 10000000;
+        reminder = bin_value;
+
+        do
+        {
+            temp = reminder/ten;
+            reminder -= (temp * ten);
+            result |= (temp << ((i-1)*4));
+            ten /= 10;
+        } while (--i);
+    }
+    return result;
+}
+
+uint16_t bcd_word(uint16_t bin_value)
+{
+int i, ten;
+uint16_t result = 0, temp, reminder;
+
+    if (bin_value > 9999)
+    {
+        app_flags |= FLAG_V_MASK;
+    }
+    else
+    {
+        i = 4;
+        ten = 1000;
+        reminder = bin_value;
+
+        do
+        {
+            temp = reminder/ten;
+            reminder -= (temp * ten);
+            result |= (temp << ((i-1)*4));
+            ten /= 10;
+        } while (--i);
+    }
+    return result;
+}
+
+uint8_t bcd_byte(uint8_t bin_value)
+{
+    if (bin_value > 99)
     {
         app_flags |= FLAG_V_MASK;
         return 0;
     }
     else
     {
-        return (byte/10) << 4 | (byte % 10);
+        return (bin_value/10) << 4 | (bin_value % 10);
     }
-}
-
-uint8_t bin_byte(uint8_t byte)
-{
-    return ((byte & 0xf0)>>4)*10 + (byte & 0x0f);
 }
 
 uint8_t sxt_byte(void)
@@ -385,7 +520,7 @@ uint8_t sxt_byte(void)
 /* reg = 0 to F */
 int16_t get_addr(uint8_t reg)
 {
-    return app_reg[reg][1]*256 + app_reg[reg][0];
+    return app_reg[reg].W[0];
 }
 
 /* reg = 0 to F */
@@ -401,19 +536,17 @@ int16_t disp16;
 /* reg = 0 to F */
 void set_addr(uint8_t reg, int16_t addr)
 {
-    app_reg[reg][1] = (addr >> 8) & 0xff;
-    app_reg[reg][0] = addr & 0xff;
+    app_reg[reg].W[0] = addr;
 }
 
 int16_t getsp(void)
 {
-    return app_reg[15][1]*256 + app_reg[15][0];
+    return app_reg[15].W[0];
 }
 
 void setsp(int16_t value)
 {
-    app_reg[15][1] = (value >> 8) & 0xff;
-    app_reg[15][0] = value & 0xff;
+    app_reg[15].W[0] = value;
 }
 
 void branch(uint8_t param)
@@ -465,8 +598,8 @@ int16_t temp;
 
     put_retaddr(app_pc + app_size); // next instruction after call
     temp = get_disp();
-    app_pc += temp;
-    if (step_mode) wprintw(wConsole,"BSR %04X (%04X)\n",temp, app_pc);
+    app_pc = (app_pc+app_size+temp) & 0xffff;
+    if (step_mode) wprintw(wConsole,"BSR %04X (%04X)\n",temp & 0xFFFF, app_pc);
 }
 
 void br_always(void)
@@ -475,7 +608,7 @@ int16_t temp;
 
     temp = get_disp();
     if (step_mode) wprintw(wConsole,"BR %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
-    app_pc = app_pc + app_size + temp;
+    app_pc = (app_pc+app_size+temp) & 0xffff;
 }
 
 void bsr_cond(uint8_t param)
@@ -505,6 +638,29 @@ uint8_t test_bit,test_mask,test;
     }
 }
 
+void ret_cond(uint8_t param)
+{
+uint8_t test_bit,test_mask,test;
+
+    // Bit 3-1  flag
+    // Bit 0    0:clear 1:set
+    test_bit = (param & 0x0E) >> 1;
+    test_mask = 1 << test_bit;
+    test = (param & 0x01) << test_bit;
+
+    if (step_mode) wprintw(wConsole,"RET: bit: %d, mask: %02X, test: %d\n",test_bit, test_mask, test);
+
+    if ((app_flags & test_mask) == test)
+    {
+        run_until_ret = false;
+        app_pc = get_retaddr();
+    }
+    else
+    {
+        //app_pc++;
+    }
+}
+
 void app_vector(uint8_t param)
 {
 uint16_t addr;
@@ -520,9 +676,9 @@ int16_t temp;
     temp = get_disp();
     if (step_mode) wprintw(wConsole,"DJNZ %04X (%04X) (%04X)\n",temp & 0xFFFF, app_pc & 0xFFFF, (app_pc+app_size+temp) & 0xFFFF);
 
-    app_reg[param][0] -= 1;
+    app_reg[param].B[0] -= 1;
 
-    if (app_reg[param][0] == 0) app_pc = app_pc + app_size;
+    if (app_reg[param].B[0] == 0) app_pc = app_pc + app_size;
     else app_pc = app_pc + app_size + temp;
 }
 
@@ -537,7 +693,7 @@ int i;
     {
         for (i=0;i<app_size;i++)
         {
-            app_reg[param][i] = 0;
+            app_reg[param].B[i] = 0;
         }
     }
     else
@@ -554,7 +710,7 @@ void inc(uint8_t param)
 {
     if (adr_mode == 0)
     {
-        op_inc(app_reg[param]);
+        op_inc(&app_reg[param].B[0]);
     }
     else
     {
@@ -565,7 +721,7 @@ void dec(uint8_t param)
 {
     if (adr_mode == 0)
     {
-        op_dec(app_reg[param]);
+        op_dec(&app_reg[param].B[0]);
     }
     else
     {
@@ -577,7 +733,7 @@ void sfl(uint8_t param)
     if (step_mode) wprintw(wConsole,"SFL: param: %02X\n",param);
     if (adr_mode == 0)
     {
-        setflags(app_reg[param]);
+        setflags(&app_reg[param].B[0]);
     }
     else
     {
@@ -589,7 +745,7 @@ void push(uint8_t param)
     // MSB to LSB
     for (int i=app_size-1;i>=0;i--)
     {
-        push_byte(app_reg[param][i]);
+        push_byte(app_reg[param].B[i]);
     }
 }
 
@@ -598,12 +754,53 @@ void pop(uint8_t param)
     // LSB to MSB
     for (int i=0;i<app_size;i++)
     {
-        app_reg[param][i] = pop_byte();
+        app_reg[param].B[i] = pop_byte();
+    }
+}
+
+void ind_jmp(uint8_t param)
+{
+    if (adr_mode == 0x37)
+    {
+        //get table pointer (reuse app_pc)
+        app_pc = getword(app_pc);
+        //get address from table
+        app_pc = getword(app_pc);
+        return;
+    }
+
+    switch(adr_mode & 0xF0)
+    {
+        case 0xE0: // (r)
+            app_pc = get_addr(param);
+            break;
+        case 0xF0: // (table)[r]
+            //get table pointer (reuse app_pc)
+            if (step_mode) wprintw(wConsole,"IND CALL (table): PC: %04X\n",app_pc);
+            app_pc = getword(app_pc) + get_addr(param)*2;
+            if (step_mode) wprintw(wConsole,"(table)[r]: %04X, %04X\n",app_pc,getword(app_pc));
+            //get address from table
+            app_pc = getword(app_pc);
+            break;
+        default:
+            illegal_inst();
     }
 }
 
 void ind_call(uint8_t param)
 {
+    if (adr_mode == 0x37)
+    {
+        put_retaddr(app_pc+2);
+        //get table pointer (reuse app_pc)
+        if (step_mode) wprintw(wConsole,"IND CALL (table): PC: %04X\n",app_pc);
+        app_pc = getword(app_pc);
+        if (step_mode) wprintw(wConsole,"(table): %04X, %04X\n",app_pc,getword(app_pc));
+        //get address from table
+        app_pc = getword(app_pc);
+        return;
+    }
+
     switch(adr_mode & 0xF0)
     {
         case 0xE0: // (r)
@@ -626,7 +823,35 @@ void ind_call(uint8_t param)
 
 void ind_bsr(uint8_t param)
 {
-    switch(adr_mode & 0xF0)
+uint16_t table, table_offset;
+
+    if (adr_mode == 0x37)
+    {
+        switch(app_size)
+        {
+            case 1:
+                put_retaddr(app_pc + 1); // next instruction after call
+                wprintw(wConsole,"BSR (r): PC: %04X, MEM: %02X\n",app_pc,app_memory[app_pc]);
+                //get table pointer (reuse app_pc)
+                table = app_pc +1 + app_memory[app_pc];
+                //get address from table
+                app_pc = getword(table);
+                wprintw(wConsole,"value: %04X\n",app_pc);
+                break;
+            case 2:
+                put_retaddr(app_pc + 2); // next instruction after call
+                //get table pointer (reuse app_pc)
+                table = app_pc + getword(app_pc);
+                //get address from table
+                app_pc = getword(table);
+                break;
+            default:
+                illegal_inst();
+        }
+        return;
+    }
+
+	switch(adr_mode & 0xF0)
     {
         case 0xE0: // (r)
             put_retaddr(app_pc + 2); // next instruction after call
@@ -639,23 +864,29 @@ void ind_bsr(uint8_t param)
                     put_retaddr(app_pc + 1); // next instruction after call
                     wprintw(wConsole,"BSR (r): PC: %04X, MEM: %02X\n",app_pc,app_memory[app_pc]);
                     //get table pointer (reuse app_pc)
-                    app_pc = app_pc +1 + app_memory[app_pc] + get_addr(param)*2;
-                    wprintw(wConsole,"table: %04X\n",app_pc);
+                    table = app_pc +1 + app_memory[app_pc];
+					table_offset = get_addr(param)*2;
+                    wprintw(wConsole,"table: %04X offset: %04X\n", app_pc, table_offset);
+                    app_pc = table + table_offset;
+
                     //get address from table
                     app_pc = getword(app_pc);
                     wprintw(wConsole,"value: %04X\n",app_pc);
                     break;
                 case 2:
                     put_retaddr(app_pc + 2); // next instruction after call
+
                     //get table pointer (reuse app_pc)
-                    app_pc = app_pc + getword(app_pc) + get_addr(param)*2;
+                    table = app_pc + getword(app_pc);
+                    table_offset = get_addr(param)*2;
+                    app_pc = table + table_offset;
+
                     //get address from table
                     app_pc = getword(app_pc);
                     break;
                 default:
                     illegal_inst();
             }
-//            app_pc = getword(app_pc) + get_addr(src)*2;
             break;
         default:
             illegal_inst();
@@ -706,7 +937,7 @@ bool val;
     switch(adr_mode & 0xF0)
     {
         case 0:
-            app_reg[reg][0] = set_bit_val(val,bit,app_reg[reg][0]);
+            app_reg[reg].B[0] = set_bit_val(val,bit,app_reg[reg].B[0]);
             app_pc++;
             break;
         default:
@@ -731,13 +962,13 @@ uint8_t pair,bit,reg, mask;
 		    if (pair & 0x80)
 		    {
 		    	//Toggle
-                app_reg[reg][0] ^= mask;
+                app_reg[reg].B[0] ^= mask;
                 app_pc++;
 		    }
 		    else
 		    {
 		    	//Test
-                test_bit_reg(app_reg[reg][0],bit);
+                test_bit_reg(app_reg[reg].B[0],bit);
                 app_pc++;
 		    }
             break;
@@ -760,7 +991,7 @@ uint8_t pair,bit,reg,val;
     switch(adr_mode & 0xF0)
     {
         case 0:
-            if (val != get_bit_val(bit,app_reg[reg][0]))
+            if (val != get_bit_val(bit,app_reg[reg].B[0]))
             {
                 wprintw(wConsole,"Waiting for bit %d of reg %d to be %d\n",bit,reg,val>>7);
                 getchar();
@@ -777,7 +1008,7 @@ int i;
 
     for (i=0;i<app_size;i++)
     {
-        app_reg[0][i] = rand() & 0xFF;
+        app_reg[0].B[i] = rand() & 0xFF;
     }
 }
 

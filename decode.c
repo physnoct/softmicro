@@ -107,23 +107,36 @@ void decodeInstSize(char *Inst)
     }
 }
 
+// Call, Bsr, Jmp
 void decodeIndMode(uint16_t address)
 {
-uint16_t disp16, table, table_offset;
+uint16_t temp16, table, table_offset;
 uint8_t disp;
-uint8_t reg = adr_mode & 0x0f;
+uint8_t reg;
+
+    // (addr)
+    if (adr_mode == 0x37)
+    {
+        temp16 = decodeGetWord(address);
+        uint8_t low_byte = app_memory[temp16];
+	uint8_t high_byte = app_memory[temp16+1];
+        sprintf(p_decode, "(%04X) ;%02X%02X", temp16, high_byte, low_byte);
+        return;
+    }
+
+    reg = adr_mode & 0x0f;
 
     switch(adr_mode & 0xF0)
     {
         case 0xE0: // (r)
-			sprintf(p_decode, "(R%d)", adr_mode & 0x0f);
+            sprintf(p_decode, "(R%d)", adr_mode & 0x0f);
             break;
         case 0xF0: // (table)[r]
-    		switch(app_size)
+            switch(app_size)
     		{
 				case 2:
-					disp16 = decodeGetWord(address);
-					sprintf(p_decode, "(%04X)[R%d] ;%04X", disp16, reg, address + ((int16_t) disp16));
+					temp16 = decodeGetWord(address);
+					sprintf(p_decode, "(%04X)[R%d] ;%04X", temp16, reg, address + ((int16_t) temp16));
 					break;
 				case 1:
 					disp = decodeGetByte(address);
@@ -230,6 +243,11 @@ uint8_t reg;
             }
             break;
 
+        case 0xE0: //r,(addr)
+            temp16 = decodeGetWord(address);
+            sprintf(p_decode, "R%d,(%04X)", reg, temp16);
+            break;
+
         case 0xF0: //r,#
         	sprintf(p_decode, "R%d,#", reg);
         	p_decode += 4;
@@ -239,6 +257,31 @@ uint8_t reg;
 
         default:
         	DecodeIllegal_inst();
+    }
+}
+
+void decodeIndexedReg(uint16_t address)
+{
+uint8_t temp1, temp2, i1, i2;
+
+    temp1 = decodeGetByte(address++);	//reg pair
+    temp2 = decodeGetByte(address);	//value
+    i1 = temp1 & 0x0f;
+    i2 = temp2 & 0x0f;
+
+    //check app_size and index
+    if (
+        ((app_size == 2) && ((i1 > 7) || (i2 > 7))) ||
+        ((app_size == 4) && ((i1 > 3) || (i2 > 3))) ||
+        ((app_size == 8) && ((i1 > 1) || (i2 > 1))) ||
+        (app_size == 16)
+       )
+    {
+       	DecodeIllegal_inst();
+    }
+    else
+    {
+        sprintf(p_decode, "R%d.%d,R%d.%d", temp1 >> 4, temp1 & 0x0f, temp2 >> 4, temp2 & 0x0f);
     }
 }
 
@@ -269,6 +312,9 @@ uint8_t op_code, param;
 						DecodeIllegal_inst();
         		}
                 break;
+            case 0x70:
+				sprintf(p_decode, "RET %s", flag_table[param]);
+                break;
             case 0xD0:
             	//swap
             	temp = decodeGetByte(address);	//reg pair
@@ -277,12 +323,12 @@ uint8_t op_code, param;
             case 0xE0:
             	//cpdr
             	temp = decodeGetByte(address);	//reg pair
-            	sprintf(p_decode, "MCPDR (R%d,R%d),R%d", temp >> 4, temp & 0x0f, param);
+            	sprintf(p_decode, "LDDR (R%d,R%d),R%d", temp >> 4, temp & 0x0f, param);
                 break;
             case 0xF0:
             	//cpir
             	temp = decodeGetByte(address);	//reg pair
-            	sprintf(p_decode, "MCPIR (R%d,R%d),R%d", temp >> 4, temp & 0x0f, param);
+            	sprintf(p_decode, "LDIR (R%d,R%d),R%d", temp >> 4, temp & 0x0f, param);
                 break;
             default:
             	DecodeIllegal_inst();
@@ -320,28 +366,111 @@ uint8_t op_code, param;
             	sprintf(p_decode, "TOG T");
                 break;
             case 0x09: // BCD
-            	sprintf(p_decode, "BCD");
+            	sprintf(p_decode, "BCD%s", size_str(app_size));
                 break;
             case 0x0A: // BIN
-            	sprintf(p_decode, "BIN");
+            	sprintf(p_decode, "BIN%s", size_str(app_size));
                 break;
             case 0x0B: // RAND
             	sprintf(p_decode, "RAND%s", size_str(app_size));
                 break;
-            case 0x10: // STEP
+            case 0x0F: // STEP
             	sprintf(p_decode, "STEP");
                 break;
-            case 0x20: // VASM
+
+            case 0x10: //LD
+                decodeInstSize("LD");
+                decodeIndexedReg(address);
+                break;
+            case 0x11: //ADD
+                decodeInstSize("ADD");
+                decodeIndexedReg(address);
+                break;
+            case 0x12: //ADC
+                decodeInstSize("ADC");
+                decodeIndexedReg(address);
+                break;
+            case 0x13: //SUB
+                decodeInstSize("SUB");
+                decodeIndexedReg(address);
+                break;
+            case 0x14: //SBC
+                decodeInstSize("SBC");
+                decodeIndexedReg(address);
+                break;
+            case 0x15: //AND
+                decodeInstSize("AND");
+                decodeIndexedReg(address);
+                break;
+            case 0x16: //OR
+                decodeInstSize("OR");
+                decodeIndexedReg(address);
+                break;
+            case 0x17: //XOR
+                decodeInstSize("XOR");
+                decodeIndexedReg(address);
+                break;
+            case 0x18: //CP
+                decodeInstSize("CP");
+                decodeIndexedReg(address);
+                break;
+            case 0x19: //EX
+                decodeInstSize("EX");
+                decodeIndexedReg(address);
+                break;
+            case 0x1C: //OUTV
+            	temp = decodeGetByte(address++);	//port
+            	temp2 = decodeGetByte(address);	//value
+            	sprintf(p_decode, "OUT (%02X),#%02X", temp, temp2);
+                break;
+
+            case 0x1E: //IN
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "IN R%d,(R%d)", temp >> 4, temp & 0x0f);
+            	break;
+            case 0x1F: //OUT
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "OUT (R%d),R%d", temp >> 4, temp & 0x0f);
+            	break;
+            case 0x20: //VASM
             	temp = decodeGetByte(address++);
                 sprintf(p_decode, "VASM ;%d", temp);
                 break;
-            case 0x21: // MFILL
+            case 0x21: //MFILL
                 // end:     end = src  = reg_pair & 0x0f;
                 // start: begin = dest = (reg_pair & 0xf0)>>4;
             	temp = decodeGetByte(address++);	//reg pair
             	param = decodeGetByte(address);	//value
             	sprintf(p_decode, "MFILL (R%d,R%d),#%02X", temp >> 4, temp & 0x0f, param);
                 break;
+            case 0x23: //TOUP
+                sprintf(p_decode, "TOUP");
+                break;
+            case 0x24: //TOLO
+                sprintf(p_decode, "TOLO");
+                break;
+            case 0x25: //LDV
+                sprintf(p_decode, "LDV");
+                break;
+            case 0x26: //STV
+                sprintf(p_decode, "STV");
+                break;
+            case 0x27: //UMUL
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "UMUL%s R%d,R%d", size_str(app_size), temp >> 4, temp & 0x0f);
+            	break;
+            case 0x28: //UDIV
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "UDIV%s R%d,R%d", size_str(app_size), temp >> 4, temp & 0x0f);
+            	break;
+            case 0x29: //SMUL
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "SMUL%s R%d,R%d", size_str(app_size), temp >> 4, temp & 0x0f);
+            	break;
+            case 0x2A: //SDIV
+            	temp = decodeGetByte(address);	//reg pair
+            	sprintf(p_decode, "SDIV%s R%d,R%d", size_str(app_size), temp >> 4, temp & 0x0f);
+            	break;
             default:
             	DecodeIllegal_inst();
         }
@@ -446,32 +575,104 @@ void OpDecodeStep3(uint16_t address)
 			    decodeInstSize("EX");
 				decodeAddressMode(address);
 				break;
-			case 0x1e: // IN
+			case 0x1D:
+				switch(adr_mode & 0xf0)
+				{
+                    case 0xe0:
+                        decodeInstSize("ST");
+                        decodeAddressMode(address);
+                        break;
+                    case 0xf0:
+                        temp = decodeGetByte(address);
+                        temp2 = adr_mode & 0x07;
+
+                        if (adr_mode > 0xf7)
+                        {
+                            sprintf(p_decode, "IOSET %d,(%02X)", temp2, temp);
+                        }
+                        else
+                        {
+                            sprintf(p_decode, "IORES  %d,(%02X)", temp2, temp);
+                        }
+                        break;
+                    default:
+                        DecodeIllegal_inst();
+                }
+				break;
+			case 0x1E: //IN
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
             	temp = decodeGetByte(address);	//reg pair
-				sprintf(p_decode, "IN R%d,(%02X)", adr_mode & 0x0f, temp);
+				sprintf(p_decode, "IN%s R%d,(%02X)", size_str(app_size), adr_mode & 0x0f, temp);
 				break;
-			case 0x1f: // OUT
+			case 0x1F: //OUT
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
             	temp = decodeGetByte(address);	//reg pair
-				sprintf(p_decode, "OUT (%02X),R%d", temp, adr_mode & 0x0f);
+				sprintf(p_decode, "OUT%s (%02X),R%d", size_str(app_size), temp, adr_mode & 0x0f);
 				break;
-			case 0x29: // REV
+            case 0x27: //MSK
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	sprintf(p_decode, "MSK%s R0", size_str(app_size));
+                break;
+            case 0x28: //SWAP
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	sprintf(p_decode, "SWAP%s R0", size_str(app_size));
+                break;
+			case 0x29: //REV
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
 				sprintf(p_decode, "REV%s R%d", size_str(app_size), adr_mode & 0x0f);
 				break;
-			case 0x2a: // SXT
+			case 0x2A: //SXT
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
 				sprintf(p_decode, "SXT%s R%d", size_str(app_size), adr_mode & 0x0f);
 				break;
-			case 0x2b: // CPL
+			case 0x2B: //CPL
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
 				sprintf(p_decode, "CPL%s R%d", size_str(app_size), adr_mode & 0x0f);
 				break;
-			case 0x2c: // NEG
+			case 0x2C: //NEG
 				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
 				sprintf(p_decode, "NEG%s R%d", size_str(app_size), adr_mode & 0x0f);
 				break;
+            case 0x3C:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "INI (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x3D:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "OUTI (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x3E:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "INIR (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x3F:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "OTIR (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x4C:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "IND (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x4D:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "OUTD (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x4E:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "INDR (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
+            case 0x4F:
+				if ((adr_mode & 0xf0) != 0xf0) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);	//reg pair
+                sprintf(p_decode, "OTDR (R%d),(R%d),R%d", temp >> 4, temp & 0x0f, adr_mode & 0x0f);
+                break;
 			default:
 				DecodeIllegal_inst();
 		}
@@ -612,35 +813,51 @@ uint8_t op_code,param, temp;
             	temp = decodeGetByte(address);
             	sprintf(p_decode, "EX%s R%d,R%d", size_str(app_size), temp >> 4, temp & 0x0f);
                 break;
-            case 0x29: // REV
+            case 0x1E: //IN
+            	if (app_size != 2) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);
+                sprintf(p_decode, "IN%s R0,(%02X)", size_str(app_size), temp);
+                break;
+            case 0x1F: //OUT
+            	if (app_size != 2) DecodeIllegal_inst();
+            	temp = decodeGetByte(address);
+                sprintf(p_decode, "OUT%s (%02X),R0", size_str(app_size), temp);
+                break;
+            case 0x27: //MSK
+            	sprintf(p_decode, "MSK%s R0", size_str(app_size));
+                break;
+            case 0x28: //SWAP
+            	sprintf(p_decode, "SWAP%s R0", size_str(app_size));
+                break;
+            case 0x29: //REV
             	sprintf(p_decode, "REV%s R0", size_str(app_size));
                 break;
-            case 0x2a: // SXT
+            case 0x2a: //SXT
             	sprintf(p_decode, "SXT%s R0", size_str(app_size));
                 break;
-            case 0x2b: // CPL
+            case 0x2b: //CPL
             	sprintf(p_decode, "CPL%s R0", size_str(app_size));
                 break;
-            case 0x2c: // NEG
+            case 0x2c: //NEG
             	sprintf(p_decode, "NEG%s R0", size_str(app_size));
                 break;
 
             /* shift/rotate */
-            case 0x2d: // ASL/ASR
+            case 0x2d: //ASL/ASR
          		temp = decodeGetByte(address);
          		if (temp & 0x80)
          			sprintf(p_decode, "ASR%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
          		else
          			sprintf(p_decode, "ASL%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
                 break;
-            case 0x2e: // ROL/ROR
+            case 0x2e: //ROL/ROR
          		temp = decodeGetByte(address);
          		if (temp & 0x80)
          			sprintf(p_decode, "ROR%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
          		else
          			sprintf(p_decode, "ROL%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
                 break;
-            case 0x2f: // LSL/LSR
+            case 0x2f: //LSL/LSR
          		temp = decodeGetByte(address);
          		if (temp & 0x80)
          			sprintf(p_decode, "LSR%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
@@ -648,7 +865,7 @@ uint8_t op_code,param, temp;
          			sprintf(p_decode, "LSL%s R%d,%d", size_str(app_size), temp & 0x0f, (temp & 0x70) >> 4);
                 break;
 
-            case 0x30: // Extended
+            case 0x30: //Extended
                 OpDecodeExtended(address);
                 break;
             case 0x31: //BRLT
@@ -887,15 +1104,23 @@ void OpDecode(uint16_t address)
             	else
             		sprintf(p_decode, "TEST R%d.%d", temp & 0x0f, (temp >> 4) & 0x07);
                 break;
-            case 0x1c: // FIXME free opcode
-           		sprintf(p_decode, "Unused Op");
-                break;
-            case 0x1d: // BIT wait
+            case 0x1c: // BIT wait
             	temp = decodeGetByte(address);
             	if (temp & 0x80)
             		sprintf(p_decode, "WAITRNZ R%d.%d", temp & 0x0f, (temp >> 4) & 0x07);
             	else
             		sprintf(p_decode, "WAITRZ R%d.%d", temp & 0x0f, (temp >> 4) & 0x07);
+                break;
+            case 0x1d: // IORES/SET
+                temp = decodeGetByte(address);
+                if ((temp & 0x80) != 0)
+                {
+                    sprintf(p_decode, "IOSET %d,(R%d)", (temp >> 4) & 0x07, temp & 0x0f);
+                }
+                else
+                {
+                    sprintf(p_decode, "IORES %d,(R%d)", (temp >> 4) & 0x07, temp & 0x0f);
+                }
                 break;
             case 0x1e: // IN
             	temp = decodeGetByte(address);
