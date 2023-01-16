@@ -55,11 +55,11 @@
     toh => 0x24
     ldf => 0x25
     stf => 0x26
-    msk => 0x27
 }
 
 #subruledef mbyte_ops_table
 {
+    msk => 0x27
     swap => 0x28
     rev => 0x29
     sxt => 0x2a
@@ -73,6 +73,14 @@
     inc => 0x90
     dec => 0xa0
     sfl => 0xb0
+}
+
+#subruledef muldiv_ops_table
+{
+    umul => 0x27
+    udiv => 0x28
+    smul => 0x29
+    sdiv => 0x2a
 }
 
 #subruledef flags_table
@@ -105,11 +113,9 @@
     nop         => 0x00
     di          => 0x33
     ei          => 0x34
-    ret         => 0x04
     reti        => 0x05
     pushf       => 0x06
     popf        => 0x07
-    jmp {addr}  => 0x0a @ le(addr`16)
 
     vect {nb}   => {inst = 0x40 | nb`4, inst`8}
     wpz  {bit},({port}) => {inst = 0x50 | bit`3, inst`8 @ port`8}
@@ -125,11 +131,20 @@
     tog t       => 0x30 @ 0x34
 
     ;--------------------------
+    ; JMP
+    ;--------------------------
+    jmp {addr}  => 0x0a @ le(addr`16)
+    jmp ({reg: reg_table}) => {addr_prefix = 0xE0 | reg, addr_prefix`8 @ 0x0a}
+    jmp ({addr})[{reg: reg_table}] => {addr_prefix = 0xF0 | reg, addr_prefix`8 @ 0x0a @ le(addr`16)}
+    jmp ({addr}) => 0x37 @ 0x0a @ le(addr`16)
+
+    ;--------------------------
     ; CALL
     ;--------------------------
     call {addr} => 0x08 @ le(addr`16)
     call ({reg: reg_table}) => {addr_prefix = 0xE0 | reg, addr_prefix`8 @ 0x08}
     call ({addr})[{reg: reg_table}] => {addr_prefix = 0xF0 | reg, addr_prefix`8 @ 0x08 @ le(addr`16)}
+    call ({addr}) => 0x37 @ 0x08 @ le(addr`16)
 
     ;--------------------------
     ; BSR
@@ -151,6 +166,12 @@
         addr_prefix = 0xF0 | reg`4,
         0x0c @ addr_prefix`8 @ 0x09 @ le(disp`16)
     }
+
+    ;--------------------------
+    ; RET, RET cond
+    ;--------------------------
+    ret         => 0x04
+    ret {flag: flags_table} => {inst = 0x70 | flag, 0x30 @ inst`8}
 
     ;--------------------------
     ; BSR cond
@@ -179,6 +200,12 @@
     djnz.w  {dest: reg_table},{addr} => {inst = 0x70 | dest`4, disp = addr-(pc+2), assert(disp <= 0xffff), 0x0C @ inst`8 @ le(disp`16)}
 
     ;--------------------------
+    ; UMUL, UDIV, SMUL, SDIV
+    ;--------------------------
+    {op: muldiv_ops_table} {dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, 0x30 @ op`8 @ pair`8}
+    {op: muldiv_ops_table}.{size: size_table}  {dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x30 @ op`8 @ pair`8}
+
+    ;--------------------------
     ; LD,ADD,ADC,SUB,SBC,
     ; AND,OR,XOR,CP,EX
     ;--------------------------
@@ -202,6 +229,84 @@
     {op: ops_table}.{size: size_table} *--{dest: reg_table},{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3e @ op`8 @ pair`8}
     {op: ops_table}.{size: size_table} {dest: reg_table},{src: reg_table}[{disp}] => {pair = (dest << 4)|src, size`8 @ 0x3b @ op`8 @ pair`8 @ disp`8}
     {op: ops_table}.{size: size_table} {dest: reg_table}[{disp}],{src: reg_table} => {pair = (dest << 4)|src, size`8 @ 0x3f @ op`8 @ pair`8 @ disp`8}
+
+    ;Partial registers
+    {op: ops_table} {dest: reg_table}.{index1},{src: reg_table}.{index2} =>
+        {
+            assert(index1 <= 15);
+            assert(index2 <= 15);
+            dest_pair = (dest << 4)| index1`4,
+            src_pair = (src << 4)| index2`4,
+            0x30 @ op`8 @ dest_pair`8 @ src_pair`8
+        }
+
+    {op: ops_table}.w {dest: reg_table}.{index1},{src: reg_table}.{index2} =>
+        {
+            assert(index1 <= 7);
+            assert(index2 <= 7);
+            dest_pair = (dest << 4)| index1`3,
+            src_pair = (src << 4)| index2`3,
+            0x0c @ 0x30 @ op`8 @ dest_pair`8 @ src_pair`8
+        }
+
+    {op: ops_table}.d {dest: reg_table}.{index1},{src: reg_table}.{index2} =>
+        {
+            assert(index1 <= 3);
+            assert(index2 <= 3);
+            dest_pair = (dest << 4)| index1`2,
+            src_pair = (src << 4)| index2`2,
+            0x0c @ 0x30 @ op`8 @ dest_pair`8 @ src_pair`8
+        }
+
+    {op: ops_table}.q {dest: reg_table}.{index1},{src: reg_table}.{index2} =>
+        {
+            assert(index1 <= 1);
+            assert(index2 <= 1);
+            dest_pair = (dest << 4)| index1`1,
+            src_pair = (src << 4)| index2`1,
+            0x0c @ 0x30 @ op`8 @ dest_pair`8 @ src_pair`8
+        }
+
+    ;--------------------------
+    ; LD,ADD,ADC,SUB,SBC,
+    ; AND,OR,XOR,CP,EX
+    ; address access
+    ;--------------------------
+    ;ABS
+    {op: ops_table}  {dest: reg_table},({addr}) =>
+    {
+        assert(addr <= 0xffff),
+        prefix = 0xE0 | dest,
+        prefix @ op`8 @ le(addr`16)
+    }
+
+    {op: ops_table}.{size: size_table} {dest: reg_table},({addr}) =>
+    {
+        assert(addr <= 0xffff),
+        prefix = 0xE0 | dest,
+        size`8 @ prefix`8 @ op`8 @ le(addr`16)
+    }
+
+    ;BIT
+
+    ;--------------------------
+    ; ST
+    ;--------------------------
+    ;ABS
+    st ({addr}),{src: reg_table}, =>
+    {
+        assert(addr <= 0xffff),
+        prefix = 0xE0 | src,
+        prefix @ 0x1d @ le(addr`16)
+    }
+
+    st.{size: size_table} ({addr}),{src: reg_table} =>
+    {
+        assert(addr <= 0xffff),
+        prefix = 0xE0 | src,
+        size`8 @ prefix`8 @ 0x1d @ le(addr`16)
+    }
+
     ;--------------------------
     ; LD,ADD,ADC,SUB,SBC,
     ; AND,OR,XOR,CP
@@ -395,20 +500,71 @@
     bits  {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit`3 << 4) | dest`4, 0x1a @ param`8}
     tog   {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit << 4) | dest`4, 0x1b @ param`8}
     test {dest: reg_table}.{bit}  => {assert(bit<8),param = (bit << 4) | dest`4, 0x1b @ param`8}
-
-;Instruction 1C free
-
-    waitc {dest: reg_table}.{bit} => {assert(bit<8),param = (bit << 4) | dest`4, 0x1d @ param`8}
-    waits {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit << 4) | dest`4, 0x1d @ param`8}
+    waitc {dest: reg_table}.{bit} => {assert(bit<8),param = (bit << 4) | dest`4, 0x1c @ param`8}
+    waits {dest: reg_table}.{bit} => {assert(bit<8),param = 0x80 | (bit << 4) | dest`4, 0x1c @ param`8}
 
     ;--------------------------
     ; IN,OUT
     ;--------------------------
-    in {dest: reg_table},{port} => {assert(dest == 0), 0x1e @ port`8}
-    in {dest: reg_table},{port} => {assert(dest != 0), addr_prefix = 0xF0 | dest`4, address_prefix`8 @ 0x1e @ port`8}
-    out {port},{src: reg_table} => {assert(src == 0), 0x1f @ port`8}
-    out {port},{src: reg_table} => {assert(src != 0), addr_prefix = 0xF0 | src`4, address_prefix`8 @ 0x1f @ port`8}
-    ;TBD 16 bits IO Low high
+    in {dest: reg_table},({port}) => {assert(dest == 0), 0x1e @ port`8}
+    in {dest: reg_table},({port}) => {assert(dest != 0), addr_prefix = 0xF0 | dest`4, addr_prefix`8 @ 0x1e @ port`8}
+    in {dest: reg_table},({src: reg_table}) => {pair = (dest << 4)|src, 0x30 @ 0x1e @ pair`8}
+
+    out ({port}),{src: reg_table} => {assert(src == 0), 0x1f @ port`8}
+    out ({port}),{src: reg_table} => {assert(src != 0), addr_prefix = 0xF0 | src`4, addr_prefix`8 @ 0x1f @ port`8}
+    out ({dest: reg_table}),{src: reg_table} => {pair = (dest << 4)|src, 0x30 @ 0x1f @ pair`8}
+
+    outv ({port}),#{value} =>
+    {
+        assert(port <= 0xff),
+        assert(value <= 0xff),
+        0x30 @ 0x1c @ port`8 @ value`8
+    }
+
+    iores {bit},({reg: reg_table}) =>
+    {
+        assert(bit <= 0x7),
+        bitreg = (bit`3 << 4) | reg`4,
+        0x1d @ bitreg`8
+    }
+
+    ioset {bit},({reg: reg_table}) =>
+    {
+        assert(bit <= 0x7),
+        bitreg = 0x80 | (bit`3 << 4) | reg`4,
+        0x1d @ bitreg`8
+    }
+
+    iores {bit},({port}) =>
+    {
+        assert(port <= 0xff),
+        assert(bit <= 0x7),
+        addr_prefix = 0xF0 | bit`3,
+        addr_prefix`8 @ 0x1d @ port`8
+    }
+
+    ioset {bit},({port}) =>
+    {
+        assert(port <= 0xff),
+        assert(bit <= 0x7),
+        addr_prefix = 0xF8 | bit`3,
+        addr_prefix`8 @ 0x1d @ port`8
+    }
+
+    ini  ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x3c @ pair`8}
+    outi ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x3d @ pair`8}
+    inir ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x3e @ pair`8}
+    otir ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x3f @ pair`8}
+    ind  ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x4c @ pair`8}
+    outd ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x4d @ pair`8}
+    indr ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x4e @ pair`8}
+    otdr ({dest: reg_table}),({src: reg_table}),{ctr: reg_table} => {addr_prefix = 0xF0 | ctr`4, pair = (dest << 4)|src, addr_prefix`8 @ 0x4f @ pair`8}
+
+    ;16 bits IO Low high
+    in.w {dest: reg_table},({port}) => {assert(dest == 0), 0x0c @ 0x1e @ port`8}
+    in.w {dest: reg_table},({port}) => {assert(dest != 0), addr_prefix = 0xF0 | dest`4, 0x0c @ addr_prefix`8 @ 0x1e @ port`8}
+    out.w ({port}),{src: reg_table} => {assert(src == 0), 0x0c @ 0x1f @ port`8}
+    out.w ({port}),{src: reg_table} => {assert(src != 0), addr_prefix = 0xF0 | src`4, 0x0c @ addr_prefix`8 @ 0x1f @ port`8}
 
     ;--------------------------
     ; PUSH,POP
@@ -463,13 +619,13 @@
         0x30 @ inst`8 @ pair`8
     }
 
-    mcpdr ({dest: reg_table},{src: reg_table}),{ctr: reg_table} =>
+    lddr ({dest: reg_table},{src: reg_table}),{ctr: reg_table} =>
     {
         pair = (dest << 4)|src, inst = 0xE0 | ctr,
         0x30 @ inst`8 @ pair`8
     }
 
-    mcpir ({dest: reg_table},{src: reg_table}),{ctr: reg_table} =>
+    ldir ({dest: reg_table},{src: reg_table}),{ctr: reg_table} =>
     {
         pair = (dest << 4)|src, inst = 0xF0 | ctr,
         0x30 @ inst`8 @ pair`8
@@ -494,11 +650,16 @@
     ver         => 0x30 @ 0x00
     sern        => 0x30 @ 0x01
     halt        => 0x30 @ 0x02
+
+    step        => 0x30 @ 0x0F
+
+    toup        => 0x30 @ 0x23
+    tolo        => 0x30 @ 0x24
+    ldv         => 0x30 @ 0x25
+    stv         => 0x30 @ 0x26
+
     bcd         => 0x30 @ 0x09
     bin         => 0x30 @ 0x0A
-    mod10       => 0x30 @ 0x0C
-    div10       => 0x30 @ 0x0D
-    mul10       => 0x30 @ 0x0E
-
-    step        => 0x30 @ 0x10
+    bcd.{size: size_table}         => {size`8 @ 0x30 @ 0x09}
+    bin.{size: size_table}         => {size`8 @ 0x30 @ 0x0A}
 }
